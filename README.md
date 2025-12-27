@@ -132,6 +132,7 @@ print(response)
 詳細は以下のドキュメントを参照してください：
 
 - `design.md`: システム全体の設計思想とワークフロー
+- `DIAGRAMS.md`: システムアーキテクチャとワークフローの図解（mermaid形式）
 - `JSON-Schema-compliant.md`: 2段階プロンプト設計の理論的背景
 - `porting-cloudflare.md`: Cloudflare Workers対応について
 
