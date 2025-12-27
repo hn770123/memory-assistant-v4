@@ -59,10 +59,10 @@ graph TB
     ChatService --> Database
     ChatService --> StatusCallback
 
-    LLMClient <|-- MockLLM
-    LLMClient <|-- OllamaLLM
-    LLMClient <|-- AnthropicLLM
-    LLMClient <|-- CloudflareLLM
+    MockLLM -.-> LLMClient
+    OllamaLLM -.-> LLMClient
+    AnthropicLLM -.-> LLMClient
+    CloudflareLLM -.-> LLMClient
 
     OllamaLLM --> Ollama
     AnthropicLLM --> Claude
