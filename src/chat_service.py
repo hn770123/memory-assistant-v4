@@ -287,38 +287,38 @@ def create_default_attribute_masters(db: Database):
         AttributeMaster(
             attribute_id=0,
             attribute_name="プロフィール",
-            extraction_prompt="文章の中にユーザーのプロフィール（職業、役職、専門分野など）が含まれている場合、抽出してください。例: 私はエンジニアです → エンジニア",
-            judgment_prompt="次の文章に適切に答えるには、ユーザーの職業やプロフィール情報が必要ですか？「はい」または「いいえ」で答えてください。"
+            extraction_prompt="文章の中にユーザーのプロフィール（名前、職業、役職、専門分野など）が含まれている場合、抽出してください。例: 私はエンジニアです → エンジニア",
+            judgment_prompt="この質問に適切に答えるために、ユーザーのプロフィール情報が必要ですか"
         ),
         AttributeMaster(
             attribute_id=0,
             attribute_name="趣味・興味",
             extraction_prompt="文章の中にユーザーの趣味や興味関心が含まれている場合、抽出してください。例: 週末はよく登山をしています → 登山",
-            judgment_prompt="次の文章に適切に答えるには、ユーザーの趣味や興味に関する情報が必要ですか？「はい」または「いいえ」で答えてください。"
+            judgment_prompt="この質問に適切に答えるために、ユーザーの趣味や興味に関する情報が必要ですか"
         ),
         AttributeMaster(
             attribute_id=0,
             attribute_name="スケジュール",
             extraction_prompt="文章の中に予定やスケジュールに関する情報が含まれている場合、抽出してください。例: 来週の月曜日に会議があります → 来週月曜日: 会議",
-            judgment_prompt="次の文章に適切に答えるには、ユーザーのスケジュール情報が必要ですか？「はい」または「いいえ」で答えてください。"
+            judgment_prompt="この質問に適切に答えるために、ユーザーのスケジュール情報が必要ですか"
         ),
         AttributeMaster(
             attribute_id=0,
             attribute_name="連絡先",
             extraction_prompt="文章の中に連絡先情報（メールアドレス、電話番号など）が含まれている場合、抽出してください。",
-            judgment_prompt="次の文章に適切に答えるには、ユーザーの連絡先情報が必要ですか？「はい」または「いいえ」で答えてください。"
+            judgment_prompt="この質問に適切に答えるために、ユーザーの連絡先情報が必要ですか"
         ),
         AttributeMaster(
             attribute_id=0,
             attribute_name="好み・嗜好",
             extraction_prompt="文章の中にユーザーの好みや嗜好（食べ物、色、スタイルなど）が含まれている場合、抽出してください。例: コーヒーより紅茶派です → 紅茶派",
-            judgment_prompt="次の文章に適切に答えるには、ユーザーの好みや嗜好に関する情報が必要ですか？「はい」または「いいえ」で答えてください。"
+            judgment_prompt="この質問に適切に答えるために、ユーザーの好みや嗜好に関する情報が必要ですか"
         ),
         AttributeMaster(
             attribute_id=0,
             attribute_name="目標・課題",
             extraction_prompt="文章の中にユーザーの目標や抱えている課題が含まれている場合、抽出してください。例: 来月までにプロジェクトを完成させたい → プロジェクト完成（来月まで）",
-            judgment_prompt="次の文章に適切に答えるには、ユーザーの目標や課題に関する情報が必要ですか？「はい」または「いいえ」で答えてください。"
+            judgment_prompt="この質問に適切に答えるために、ユーザーの目標や課題に関する情報が必要ですか"
         ),
     ]
 
