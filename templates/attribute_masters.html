@@ -61,6 +61,7 @@
 
 {% block extra_js %}
 <script>
+document.addEventListener('DOMContentLoaded', () => {
 const mastersContainer = document.getElementById('mastersContainer');
 const addMasterBtn = document.getElementById('addMasterBtn');
 const initDefaultsBtn = document.getElementById('initDefaultsBtn');
@@ -146,7 +147,7 @@ addMasterBtn.addEventListener('click', () => {
 });
 
 // 編集
-async function editMaster(attributeId) {
+window.editMaster = async function(attributeId) {
     editingMasterId = attributeId;
     modalTitle.textContent = '属性マスタ編集';
 
@@ -167,7 +168,7 @@ async function editMaster(attributeId) {
 }
 
 // 削除
-async function deleteMaster(attributeId) {
+window.deleteMaster = async function(attributeId) {
     if (!confirm('この属性マスタを削除しますか？')) return;
 
     try {
@@ -268,5 +269,6 @@ refreshMastersBtn.addEventListener('click', loadMasters);
 
 // ページ読み込み時に読み込み
 loadMasters();
+});
 </script>
 {% endblock %}
