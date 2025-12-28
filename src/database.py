@@ -3,6 +3,7 @@ SQLiteデータベース操作
 属性マスタと属性テーブルのCRUD操作
 """
 import sqlite3
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -15,20 +16,23 @@ class Database:
 
     def __init__(self, db_path: str = "memory_assistant.db"):
         self.db_path = db_path
-        self._connection: Optional[sqlite3.Connection] = None
+        self._local = threading.local()
 
     def connect(self) -> sqlite3.Connection:
-        """データベース接続を取得"""
-        if self._connection is None:
-            self._connection = sqlite3.connect(self.db_path)
-            self._connection.row_factory = sqlite3.Row
-        return self._connection
+        """データベース接続を取得（スレッドローカル）"""
+        if not hasattr(self._local, 'connection') or self._local.connection is None:
+            self._local.connection = sqlite3.connect(
+                self.db_path,
+                check_same_thread=False  # マルチスレッド環境での警告を抑制
+            )
+            self._local.connection.row_factory = sqlite3.Row
+        return self._local.connection
 
     def close(self):
         """接続をクローズ"""
-        if self._connection:
-            self._connection.close()
-            self._connection = None
+        if hasattr(self._local, 'connection') and self._local.connection:
+            self._local.connection.close()
+            self._local.connection = None
 
     def initialize(self):
         """テーブルを作成"""
