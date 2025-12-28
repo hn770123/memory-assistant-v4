@@ -11,8 +11,10 @@ from dotenv import load_dotenv
 
 from src.database import Database
 from src.chat_service import ChatService, create_default_attribute_masters
-from src.llm_client import MockLLMClient, OllamaClient
-from src.models import AttributeMaster, AttributeRecord
+from src.llm_client import MockLLMClient, OllamaClient, LLMResponse
+from src.models import AttributeMaster, AttributeRecord, LLMLog
+from datetime import datetime
+import json
 
 # 環境変数を読み込み
 load_dotenv()
@@ -44,21 +46,36 @@ else:
     llm_client = MockLLMClient()
     llm_client.add_generate_response("こんにちは！どのようにお手伝いできますか？")
 
+# LLMログコールバック関数
+def llm_log_callback(prompt: str, response: LLMResponse, task_type: str, attribute_name: str = None):
+    """LLMとのやり取りをデータベースに記録"""
+    # モデル名を取得
+    model = getattr(llm_client, 'model', 'mock')
+
+    # raw_responseをJSON文字列に変換
+    raw_response_str = None
+    if response.raw_response:
+        raw_response_str = json.dumps(response.raw_response, ensure_ascii=False)
+
+    log = LLMLog(
+        log_id=None,
+        timestamp=datetime.now(),
+        model=model,
+        task_type=task_type,
+        prompt=prompt,
+        response=response.content,
+        raw_response=raw_response_str,
+        attribute_name=attribute_name,
+        metadata=None
+    )
+    db.insert_llm_log(log)
+
+
+# LLMクライアントにログコールバックを設定
+llm_client.set_log_callback(llm_log_callback)
+
 # チャットサービス初期化
 chat_service = ChatService(llm_client, db)
-
-# LLMとのやり取りを記録するログ
-llm_logs = []
-
-
-def log_llm_interaction(interaction_type: str, prompt: str, response: str):
-    """LLMとのやり取りをログに記録"""
-    llm_logs.append({
-        "type": interaction_type,
-        "prompt": prompt,
-        "response": response,
-        "timestamp": None  # フロントエンドで設定
-    })
 
 
 # ================
@@ -126,9 +143,6 @@ def api_chat():
         # 最終的な応答を取得（generatorの戻り値）
         response = chat_service.process_user_input(user_input)
 
-        # LLMログを記録（簡易版）
-        log_llm_interaction("chat", user_input, response.response_text)
-
         return jsonify({
             "response": response.response_text,
             "used_attributes": response.used_attributes,
@@ -167,13 +181,31 @@ def api_chat_clear():
 @app.route("/api/logs", methods=["GET"])
 def api_logs():
     """LLMログを取得"""
-    return jsonify({"logs": llm_logs})
+    limit = request.args.get("limit", type=int)
+    logs = db.get_all_llm_logs(limit=limit)
+
+    return jsonify({
+        "logs": [
+            {
+                "log_id": log.log_id,
+                "timestamp": log.timestamp.isoformat(),
+                "model": log.model,
+                "task_type": log.task_type,
+                "prompt": log.prompt,
+                "response": log.response,
+                "raw_response": log.raw_response,
+                "attribute_name": log.attribute_name,
+                "metadata": log.metadata
+            }
+            for log in logs
+        ]
+    })
 
 
 @app.route("/api/logs/clear", methods=["POST"])
 def api_logs_clear():
     """ログをクリア"""
-    llm_logs.clear()
+    db.delete_all_llm_logs()
     return jsonify({"success": True})
 
 

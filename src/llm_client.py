@@ -21,12 +21,25 @@ class LLMResponse:
 class LLMClient(ABC):
     """LLMクライアントの抽象基底クラス"""
 
+    def __init__(self):
+        # ログ記録用コールバック関数 (prompt, response, task_type, attribute_name) -> None
+        self.log_callback: Optional[Callable[[str, LLMResponse, str, Optional[str]], None]] = None
+
     @abstractmethod
-    def generate(self, prompt: str) -> LLMResponse:
+    def generate(self, prompt: str, task_type: str = "general", attribute_name: Optional[str] = None) -> LLMResponse:
         """プロンプトからテキストを生成"""
         pass
 
-    def judge(self, judgment_prompt: str, user_input: str) -> bool:
+    def set_log_callback(self, callback: Callable[[str, LLMResponse, str, Optional[str]], None]):
+        """ログ記録用コールバック関数を設定"""
+        self.log_callback = callback
+
+    def _log_interaction(self, prompt: str, response: LLMResponse, task_type: str, attribute_name: Optional[str] = None):
+        """ログを記録（コールバックが設定されている場合）"""
+        if self.log_callback:
+            self.log_callback(prompt, response, task_type, attribute_name)
+
+    def judge(self, judgment_prompt: str, user_input: str, attribute_name: Optional[str] = None) -> bool:
         """
         判定タスク: ユーザー入力に対して判定プロンプトで評価
 
@@ -45,11 +58,11 @@ class LLMClient(ABC):
 
 回答（「はい」または「いいえ」のみ）:"""
 
-        response = self.generate(prompt)
+        response = self.generate(prompt, task_type="judgment", attribute_name=attribute_name)
         answer = response.content.strip().lower()
         return "はい" in answer or "yes" in answer
 
-    def extract(self, extraction_prompt: str, user_input: str) -> Optional[str]:
+    def extract(self, extraction_prompt: str, user_input: str, attribute_name: Optional[str] = None) -> Optional[str]:
         """
         抽出タスク: ユーザー入力から情報を抽出
 
@@ -68,7 +81,7 @@ class LLMClient(ABC):
 抽出する情報がない場合は「なし」と回答してください。
 抽出された内容:"""
 
-        response = self.generate(prompt)
+        response = self.generate(prompt, task_type="extraction", attribute_name=attribute_name)
         content = response.content.strip()
 
         if content == "なし" or content == "" or "なし" in content[:10]:
@@ -109,7 +122,7 @@ class LLMClient(ABC):
 
 応答:"""
 
-        response = self.generate(prompt)
+        response = self.generate(prompt, task_type="response")
         return response.content.strip()
 
 
@@ -121,6 +134,7 @@ class MockLLMClient(LLMClient):
     """
 
     def __init__(self):
+        super().__init__()
         # 判定応答のパターン
         self.judgment_responses: dict[str, bool] = {}
         # 抽出応答のパターン
@@ -145,7 +159,7 @@ class MockLLMClient(LLMClient):
         """生成応答を追加"""
         self.generate_responses.append(response)
 
-    def generate(self, prompt: str) -> LLMResponse:
+    def generate(self, prompt: str, task_type: str = "general", attribute_name: Optional[str] = None) -> LLMResponse:
         """モック生成"""
         self.call_history.append({"type": "generate", "prompt": prompt})
 
@@ -156,23 +170,35 @@ class MockLLMClient(LLMClient):
         if "「はい」または「いいえ」" in prompt:
             for attr_name, response in self.judgment_responses.items():
                 if attr_name in prompt or self._check_attribute_context(prompt, attr_name):
-                    return LLMResponse(content="はい" if response else "いいえ")
-            return LLMResponse(content="いいえ")
+                    llm_response = LLMResponse(content="はい" if response else "いいえ")
+                    self._log_interaction(prompt, llm_response, task_type, attribute_name)
+                    return llm_response
+            llm_response = LLMResponse(content="いいえ")
+            self._log_interaction(prompt, llm_response, task_type, attribute_name)
+            return llm_response
 
         # 抽出プロンプトのパターンをチェック
         if "抽出された内容:" in prompt:
             for attr_name, response in self.extraction_responses.items():
                 if attr_name in prompt or self._check_attribute_context(prompt, attr_name):
-                    return LLMResponse(content=response if response else "なし")
-            return LLMResponse(content="なし")
+                    llm_response = LLMResponse(content=response if response else "なし")
+                    self._log_interaction(prompt, llm_response, task_type, attribute_name)
+                    return llm_response
+            llm_response = LLMResponse(content="なし")
+            self._log_interaction(prompt, llm_response, task_type, attribute_name)
+            return llm_response
 
         # 応答生成
         if self.generate_responses and self._generate_index < len(self.generate_responses):
             response = self.generate_responses[self._generate_index]
             self._generate_index += 1
-            return LLMResponse(content=response)
+            llm_response = LLMResponse(content=response)
+            self._log_interaction(prompt, llm_response, task_type, attribute_name)
+            return llm_response
 
-        return LLMResponse(content="モックの応答です。")
+        llm_response = LLMResponse(content="モックの応答です。")
+        self._log_interaction(prompt, llm_response, task_type, attribute_name)
+        return llm_response
 
     def _check_attribute_context(self, prompt: str, attr_name: str) -> bool:
         """プロンプトに属性のコンテキストが含まれているか確認"""
@@ -182,7 +208,7 @@ class MockLLMClient(LLMClient):
             return any(p in prompt for p in patterns)
         return False
 
-    def judge(self, judgment_prompt: str, user_input: str) -> bool:
+    def judge(self, judgment_prompt: str, user_input: str, attribute_name: Optional[str] = None) -> bool:
         """モック判定"""
         self.call_history.append({
             "type": "judge",
@@ -196,9 +222,9 @@ class MockLLMClient(LLMClient):
                 return response
 
         # デフォルトの判定ロジック
-        return super().judge(judgment_prompt, user_input)
+        return super().judge(judgment_prompt, user_input, attribute_name)
 
-    def extract(self, extraction_prompt: str, user_input: str) -> Optional[str]:
+    def extract(self, extraction_prompt: str, user_input: str, attribute_name: Optional[str] = None) -> Optional[str]:
         """モック抽出"""
         self.call_history.append({
             "type": "extract",
@@ -212,7 +238,7 @@ class MockLLMClient(LLMClient):
                 return response
 
         # デフォルトの抽出ロジック
-        return super().extract(extraction_prompt, user_input)
+        return super().extract(extraction_prompt, user_input, attribute_name)
 
     def reset(self):
         """状態をリセット"""
@@ -231,10 +257,11 @@ class OllamaClient(LLMClient):
         base_url: str = "http://localhost:11434",
         model: str = "llama3.1:8b"
     ):
+        super().__init__()
         self.base_url = base_url.rstrip("/")
         self.model = model
 
-    def generate(self, prompt: str) -> LLMResponse:
+    def generate(self, prompt: str, task_type: str = "general", attribute_name: Optional[str] = None) -> LLMResponse:
         """Ollama APIを呼び出してテキストを生成"""
         url = f"{self.base_url}/api/generate"
 
@@ -254,10 +281,13 @@ class OllamaClient(LLMClient):
         try:
             with urllib.request.urlopen(request, timeout=60) as response:
                 result = json.loads(response.read().decode("utf-8"))
-                return LLMResponse(
+                llm_response = LLMResponse(
                     content=result.get("response", ""),
                     raw_response=result
                 )
+                # ログを記録
+                self._log_interaction(prompt, llm_response, task_type, attribute_name)
+                return llm_response
         except urllib.error.URLError as e:
             raise ConnectionError(f"Ollama API接続エラー: {e}")
         except json.JSONDecodeError as e:

@@ -48,22 +48,47 @@ async function loadLogs() {
             const logItem = document.createElement('div');
             logItem.className = 'log-item';
 
-            const timestamp = new Date().toLocaleString('ja-JP');
+            const timestamp = new Date(log.timestamp).toLocaleString('ja-JP');
+            const taskTypeLabel = getTaskTypeLabel(log.task_type);
+            const attributeInfo = log.attribute_name ? ` - ${escapeHtml(log.attribute_name)}` : '';
+
+            let rawResponseHtml = '';
+            if (log.raw_response) {
+                try {
+                    const rawData = JSON.parse(log.raw_response);
+                    rawResponseHtml = `
+                        <div class="log-section">
+                            <h4>Raw Response (詳細)</h4>
+                            <pre>${escapeHtml(JSON.stringify(rawData, null, 2))}</pre>
+                        </div>
+                    `;
+                } catch (e) {
+                    rawResponseHtml = `
+                        <div class="log-section">
+                            <h4>Raw Response (詳細)</h4>
+                            <pre>${escapeHtml(log.raw_response)}</pre>
+                        </div>
+                    `;
+                }
+            }
 
             logItem.innerHTML = `
                 <div class="log-header">
-                    <span class="log-type">${escapeHtml(log.type)}</span>
+                    <span class="log-id">#${log.log_id}</span>
+                    <span class="log-type">${taskTypeLabel}${attributeInfo}</span>
+                    <span class="log-model">${escapeHtml(log.model)}</span>
                     <span class="log-timestamp">${timestamp}</span>
                 </div>
                 <div class="log-content">
                     <div class="log-section">
-                        <h4>送信 (プロンプト)</h4>
+                        <h4>送信 (プロンプト全体)</h4>
                         <pre>${escapeHtml(log.prompt)}</pre>
                     </div>
                     <div class="log-section">
-                        <h4>受信 (応答)</h4>
+                        <h4>受信 (応答テキスト)</h4>
                         <pre>${escapeHtml(log.response)}</pre>
                     </div>
+                    ${rawResponseHtml}
                 </div>
             `;
 
@@ -73,6 +98,18 @@ async function loadLogs() {
         console.error('ログの読み込みに失敗:', error);
         logsContainer.innerHTML = '<p class="error">ログの読み込みに失敗しました</p>';
     }
+}
+
+// タスクタイプのラベルを取得
+function getTaskTypeLabel(taskType) {
+    const labels = {
+        'judgment': '判定',
+        'extraction': '抽出',
+        'response': '応答生成',
+        'attribute_extraction': '属性抽出',
+        'general': '一般'
+    };
+    return labels[taskType] || taskType;
 }
 
 // HTMLエスケープ
