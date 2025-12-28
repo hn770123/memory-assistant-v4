@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from .models import AttributeMaster, AttributeRecord
+from .models import AttributeMaster, AttributeRecord, LLMLog
 
 
 class Database:
@@ -58,6 +58,21 @@ class Database:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY (attribute_id) REFERENCES attribute_master(attribute_id)
+            )
+        """)
+
+        # LLMログテーブル
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS llm_logs (
+                log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                model TEXT NOT NULL,
+                task_type TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                response TEXT NOT NULL,
+                raw_response TEXT,
+                attribute_name TEXT,
+                metadata TEXT
             )
         """)
 
@@ -239,3 +254,65 @@ class Database:
         if records:
             return records[0].content
         return None
+
+    # === LLMログ操作 ===
+
+    def insert_llm_log(self, log: LLMLog) -> int:
+        """LLMログを登録"""
+        conn = self.connect()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO llm_logs (
+                timestamp, model, task_type, prompt, response,
+                raw_response, attribute_name, metadata
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                log.timestamp.isoformat(),
+                log.model,
+                log.task_type,
+                log.prompt,
+                log.response,
+                log.raw_response,
+                log.attribute_name,
+                log.metadata
+            )
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+    def get_all_llm_logs(self, limit: Optional[int] = None) -> list[LLMLog]:
+        """全LLMログを取得（新しい順）"""
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        query = "SELECT * FROM llm_logs ORDER BY log_id DESC"
+        if limit:
+            query += f" LIMIT {limit}"
+
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        return [
+            LLMLog(
+                log_id=row["log_id"],
+                timestamp=datetime.fromisoformat(row["timestamp"]),
+                model=row["model"],
+                task_type=row["task_type"],
+                prompt=row["prompt"],
+                response=row["response"],
+                raw_response=row["raw_response"],
+                attribute_name=row["attribute_name"],
+                metadata=row["metadata"]
+            )
+            for row in rows
+        ]
+
+    def delete_all_llm_logs(self) -> bool:
+        """全LLMログを削除"""
+        conn = self.connect()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM llm_logs")
+        conn.commit()
+        return True

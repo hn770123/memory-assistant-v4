@@ -69,3 +69,23 @@ class LLMTaskStatus:
             "attribute_extraction": f"ユーザー入力から「{self.attribute_name}」を抽出中",
         }
         return task_descriptions.get(self.task_type, "処理中")
+
+
+@dataclass
+class LLMLog:
+    """LLMリクエスト/レスポンスログ"""
+    log_id: Optional[int]
+    timestamp: datetime
+    model: str
+    task_type: str  # "judgment", "extraction", "response", "attribute_extraction"
+    prompt: str  # LLMに送信した完全なプロンプト
+    response: str  # LLMからの応答テキスト
+    raw_response: Optional[str] = None  # JSON形式のraw response
+    attribute_name: Optional[str] = None  # タスクに関連する属性名
+    metadata: Optional[str] = None  # 追加のメタデータ（JSON形式）
+
+    def __post_init__(self):
+        if not self.prompt:
+            raise ValueError("プロンプトは必須です")
+        if not self.response:
+            raise ValueError("レスポンスは必須です")

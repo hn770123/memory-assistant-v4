@@ -71,7 +71,7 @@ class ChatService:
             task_statuses.append(status)
             self._emit_status(status)
 
-            is_required = self.llm.judge(master.judgment_prompt, user_input)
+            is_required = self.llm.judge(master.judgment_prompt, user_input, master.attribute_name)
 
             status.status = "completed"
             self._emit_status(status)
@@ -133,7 +133,7 @@ class ChatService:
             task_statuses.append(status)
             self._emit_status(status)
 
-            extracted = self.llm.extract(master.extraction_prompt, user_input)
+            extracted = self.llm.extract(master.extraction_prompt, user_input, master.attribute_name)
 
             if extracted:
                 # 属性レコードを登録
@@ -188,7 +188,7 @@ class ChatService:
             task_statuses.append(status)
             yield status
 
-            is_required = self.llm.judge(master.judgment_prompt, user_input)
+            is_required = self.llm.judge(master.judgment_prompt, user_input, master.attribute_name)
 
             status.status = "completed"
             yield status
@@ -246,7 +246,7 @@ class ChatService:
             task_statuses.append(status)
             yield status
 
-            extracted = self.llm.extract(master.extraction_prompt, user_input)
+            extracted = self.llm.extract(master.extraction_prompt, user_input, master.attribute_name)
 
             if extracted:
                 record = AttributeRecord(
