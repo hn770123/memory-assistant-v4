@@ -39,6 +39,7 @@
 
 {% block extra_js %}
 <script>
+document.addEventListener('DOMContentLoaded', () => {
 const chatForm = document.getElementById('chatForm');
 const messageInput = document.getElementById('messageInput');
 const chatMessages = document.getElementById('chatMessages');
@@ -227,5 +228,6 @@ clearHistoryBtn.addEventListener('click', async () => {
 
 // ページ読み込み時に履歴を読み込み
 loadChatHistory();
+});
 </script>
 {% endblock %}

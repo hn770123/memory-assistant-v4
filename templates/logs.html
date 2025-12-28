@@ -25,6 +25,7 @@
 
 {% block extra_js %}
 <script>
+document.addEventListener('DOMContentLoaded', () => {
 const logsContainer = document.getElementById('logsContainer');
 const refreshLogsBtn = document.getElementById('refreshLogsBtn');
 const clearLogsBtn = document.getElementById('clearLogsBtn');
@@ -150,5 +151,6 @@ clearLogsBtn.addEventListener('click', async () => {
 
 // ページ読み込み時にログを読み込み
 loadLogs();
+});
 </script>
 {% endblock %}
