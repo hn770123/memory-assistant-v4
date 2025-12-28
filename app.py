@@ -29,7 +29,7 @@ db = Database("memory_assistant.db")
 db.initialize()
 
 # LLMクライアント初期化
-llm_provider = os.environ.get("LLM_PROVIDER", "mock")
+llm_provider = os.environ.get("LLM_PROVIDER", "ollama")
 
 if llm_provider == "ollama":
     try:
