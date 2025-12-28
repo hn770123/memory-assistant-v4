@@ -56,10 +56,19 @@ async function loadLogs() {
             if (log.raw_response) {
                 try {
                     const rawData = JSON.parse(log.raw_response);
+
+                    // contextフィールドが数値配列の場合は処理
+                    let displayData = {...rawData};
+                    if (displayData.context && Array.isArray(displayData.context)) {
+                        // contextが数値配列の場合は要約表示
+                        const contextLength = displayData.context.length;
+                        displayData.context = `[トークンID配列: ${contextLength}個のトークン (表示省略)]`;
+                    }
+
                     rawResponseHtml = `
                         <div class="log-section">
                             <h4>Raw Response (詳細)</h4>
-                            <pre>${escapeHtml(JSON.stringify(rawData, null, 2))}</pre>
+                            <pre>${escapeHtml(JSON.stringify(displayData, null, 2))}</pre>
                         </div>
                     `;
                 } catch (e) {

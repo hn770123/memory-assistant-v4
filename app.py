@@ -5,7 +5,7 @@ FlaskベースのWebインターフェースを提供
 """
 import os
 import json
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, Response, stream_with_context
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -132,16 +132,20 @@ def api_chat():
         statuses = []
         response = None
 
-        for status in chat_service.process_user_input_streaming(user_input):
-            statuses.append({
-                "task_type": status.task_type,
-                "attribute_name": status.attribute_name,
-                "status": status.status,
-                "display_text": status.display_text
-            })
-
-        # 最終的な応答を取得（generatorの戻り値）
-        response = chat_service.process_user_input(user_input)
+        # ジェネレーターを実行し、ステータスを収集
+        gen = chat_service.process_user_input_streaming(user_input)
+        try:
+            while True:
+                status = next(gen)
+                statuses.append({
+                    "task_type": status.task_type,
+                    "attribute_name": status.attribute_name,
+                    "status": status.status,
+                    "display_text": status.display_text
+                })
+        except StopIteration as e:
+            # ジェネレーターのreturn値を取得
+            response = e.value
 
         return jsonify({
             "response": response.response_text,
@@ -174,6 +178,68 @@ def api_chat_clear():
     """チャット履歴をクリア"""
     chat_service.clear_history()
     return jsonify({"success": True})
+
+
+@app.route("/api/chat/stream", methods=["POST"])
+def api_chat_stream():
+    """チャットメッセージをストリーミング処理（Server-Sent Events）"""
+    data = request.get_json()
+    user_input = data.get("message", "")
+
+    if not user_input:
+        return jsonify({"error": "メッセージが空です"}), 400
+
+    def generate():
+        """SSE用のジェネレーター関数"""
+        try:
+            gen = chat_service.process_user_input_streaming(user_input)
+
+            # ステータスをストリーミング送信
+            while True:
+                try:
+                    status = next(gen)
+                    event_data = {
+                        "type": "status",
+                        "data": {
+                            "task_type": status.task_type,
+                            "attribute_name": status.attribute_name,
+                            "status": status.status,
+                            "display_text": status.display_text
+                        }
+                    }
+                    yield f"data: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+                except StopIteration as e:
+                    # 最終的な応答を送信
+                    response = e.value
+                    final_data = {
+                        "type": "response",
+                        "data": {
+                            "response": response.response_text,
+                            "used_attributes": response.used_attributes,
+                            "extracted_attributes": response.extracted_attributes
+                        }
+                    }
+                    yield f"data: {json.dumps(final_data, ensure_ascii=False)}\n\n"
+                    break
+
+            # 完了通知
+            yield "data: {\"type\": \"done\"}\n\n"
+
+        except Exception as e:
+            error_data = {
+                "type": "error",
+                "data": {"error": str(e)}
+            }
+            yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no'
+        }
+    )
 
 
 # === ログ API ===
