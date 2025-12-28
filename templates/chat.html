@@ -113,7 +113,7 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// チャット送信
+// チャット送信（SSEを使用してリアルタイム表示）
 chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -135,7 +135,8 @@ chatForm.addEventListener('submit', async (e) => {
     sendBtn.textContent = '処理中...';
 
     try {
-        const response = await fetch('/api/chat', {
+        // SSEを使用してリアルタイム処理
+        const response = await fetch('/api/chat/stream', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -143,31 +144,57 @@ chatForm.addEventListener('submit', async (e) => {
             body: JSON.stringify({ message })
         });
 
-        const data = await response.json();
-
-        if (response.ok) {
-            // ステータスを表示（アニメーション用）
-            if (data.statuses) {
-                showStatus(data.statuses);
-                // 3秒後にクリア
-                setTimeout(clearStatus, 3000);
-            }
-
-            // アシスタントの応答を表示
-            appendMessage('assistant', data.response);
-
-            // 使用された属性と抽出された属性を表示（デバッグ用）
-            if (data.used_attributes && Object.keys(data.used_attributes).length > 0) {
-                console.log('使用された属性:', data.used_attributes);
-            }
-            if (data.extracted_attributes && data.extracted_attributes.length > 0) {
-                console.log('抽出された属性:', data.extracted_attributes);
-            }
-        } else {
-            appendMessage('system', `エラー: ${data.error}`);
+        if (!response.ok) {
+            throw new Error('サーバーエラー');
         }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        const currentStatuses = [];
+
+        while (true) {
+            const {value, done} = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, {stream: true});
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop(); // 最後の不完全な行を保持
+
+            for (const line of lines) {
+                if (!line.trim() || !line.startsWith('data: ')) continue;
+
+                const data = JSON.parse(line.substring(6));
+
+                if (data.type === 'status') {
+                    // ステータスを追加して表示
+                    currentStatuses.push(data.data);
+                    showStatus(currentStatuses);
+                } else if (data.type === 'response') {
+                    // 最終応答を表示
+                    clearStatus();
+                    appendMessage('assistant', data.data.response);
+
+                    // デバッグ情報
+                    if (data.data.used_attributes && Object.keys(data.data.used_attributes).length > 0) {
+                        console.log('使用された属性:', data.data.used_attributes);
+                    }
+                    if (data.data.extracted_attributes && data.data.extracted_attributes.length > 0) {
+                        console.log('抽出された属性:', data.data.extracted_attributes);
+                    }
+                } else if (data.type === 'error') {
+                    clearStatus();
+                    appendMessage('system', `エラー: ${data.data.error}`);
+                } else if (data.type === 'done') {
+                    // 処理完了
+                    break;
+                }
+            }
+        }
+
     } catch (error) {
         console.error('送信エラー:', error);
+        clearStatus();
         appendMessage('system', 'メッセージの送信に失敗しました');
     } finally {
         // 送信ボタンを有効化
