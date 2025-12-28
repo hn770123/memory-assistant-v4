@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}属性テーブル保守 - Memory Assistant v4{% endblock %}
+{% block nav_records %}active{% endblock %}
+
+{% block content %}
+<div class="records-container">
+    <div class="records-header">
+        <h1>属性テーブル保守</h1>
+        <div class="button-group">
+            <button id="addRecordBtn" class="btn btn-primary">新規追加</button>
+            <button id="refreshRecordsBtn" class="btn btn-secondary">更新</button>
+        </div>
+    </div>
+
+    <div class="filter-section">
+        <label for="attributeFilter">属性でフィルタ:</label>
+        <select id="attributeFilter">
+            <option value="">すべて</option>
+        </select>
+    </div>
+
+    <div class="records-info">
+        <p>属性テーブルは、ユーザーから抽出された属性データを管理します</p>
+    </div>
+
+    <div id="recordsContainer" class="records-list">
+        <p class="loading">読み込み中...</p>
+    </div>
+</div>
+
+<!-- モーダル: 属性レコード編集 -->
+<div id="recordModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle">属性レコード</h2>
+            <button class="modal-close" id="modalClose">&times;</button>
+        </div>
+        <form id="recordForm">
+            <input type="hidden" id="sequenceNo">
+
+            <div class="form-group">
+                <label for="recordAttributeId">属性 <span class="required">*</span></label>
+                <select id="recordAttributeId" required>
+                    <option value="">選択してください</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="recordContent">内容 <span class="required">*</span></label>
+                <textarea id="recordContent" rows="4" required></textarea>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="cancelBtn">キャンセル</button>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const recordsContainer = document.getElementById('recordsContainer');
+const addRecordBtn = document.getElementById('addRecordBtn');
+const refreshRecordsBtn = document.getElementById('refreshRecordsBtn');
+const attributeFilter = document.getElementById('attributeFilter');
+const recordModal = document.getElementById('recordModal');
+const modalTitle = document.getElementById('modalTitle');
+const recordForm = document.getElementById('recordForm');
+const modalClose = document.getElementById('modalClose');
+const cancelBtn = document.getElementById('cancelBtn');
+
+let editingRecordId = null;
+let attributeMasters = [];
+
+// 属性マスタを読み込み
+async function loadAttributeMasters() {
+    try {
+        const response = await fetch('/api/attribute-masters');
+        const data = await response.json();
+        attributeMasters = data.masters;
+
+        // フィルタを更新
+        attributeFilter.innerHTML = '<option value="">すべて</option>';
+        attributeMasters.forEach(master => {
+            const option = document.createElement('option');
+            option.value = master.attribute_id;
+            option.textContent = master.attribute_name;
+            attributeFilter.appendChild(option);
+        });
+
+        // モーダルのセレクトボックスを更新
+        const recordAttributeId = document.getElementById('recordAttributeId');
+        recordAttributeId.innerHTML = '<option value="">選択してください</option>';
+        attributeMasters.forEach(master => {
+            const option = document.createElement('option');
+            option.value = master.attribute_id;
+            option.textContent = master.attribute_name;
+            recordAttributeId.appendChild(option);
+        });
+    } catch (error) {
+        console.error('属性マスタの読み込みに失敗:', error);
+    }
+}
+
+// 属性レコードを読み込み
+async function loadRecords() {
+    recordsContainer.innerHTML = '<p class="loading">読み込み中...</p>';
+
+    const filterValue = attributeFilter.value;
+    const url = filterValue
+        ? `/api/attribute-records?attribute_id=${filterValue}`
+        : '/api/attribute-records';
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.records.length === 0) {
+            recordsContainer.innerHTML = '<p class="no-data">属性レコードがありません</p>';
+            return;
+        }
+
+        recordsContainer.innerHTML = '';
+
+        const table = document.createElement('table');
+        table.className = 'data-table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>No</th>
+                    <th>属性名</th>
+                    <th>内容</th>
+                    <th>作成日時</th>
+                    <th>更新日時</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="recordsTableBody"></tbody>
+        `;
+
+        recordsContainer.appendChild(table);
+
+        const tbody = document.getElementById('recordsTableBody');
+
+        data.records.forEach(record => {
+            const master = attributeMasters.find(m => m.attribute_id === record.attribute_id);
+            const attributeName = master ? master.attribute_name : `ID: ${record.attribute_id}`;
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${record.sequence_no}</td>
+                <td><strong>${escapeHtml(attributeName)}</strong></td>
+                <td>${escapeHtml(record.content)}</td>
+                <td>${formatDate(record.created_at)}</td>
+                <td>${formatDate(record.updated_at)}</td>
+                <td class="actions">
+                    <button class="btn btn-sm btn-secondary" onclick="editRecord(${record.sequence_no}, ${record.attribute_id}, '${escapeForJs(record.content)}')">編集</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteRecord(${record.sequence_no})">削除</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    } catch (error) {
+        console.error('読み込みに失敗:', error);
+        recordsContainer.innerHTML = '<p class="error">読み込みに失敗しました</p>';
+    }
+}
+
+// HTMLエスケープ
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// JSエスケープ
+function escapeForJs(text) {
+    return text.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n');
+}
+
+// 日時フォーマット
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleString('ja-JP');
+}
+
+// 新規追加
+addRecordBtn.addEventListener('click', () => {
+    editingRecordId = null;
+    modalTitle.textContent = '新規属性レコード';
+    document.getElementById('sequenceNo').value = '';
+    document.getElementById('recordAttributeId').value = '';
+    document.getElementById('recordContent').value = '';
+    recordModal.style.display = 'flex';
+});
+
+// 編集
+function editRecord(sequenceNo, attributeId, content) {
+    editingRecordId = sequenceNo;
+    modalTitle.textContent = '属性レコード編集';
+
+    document.getElementById('sequenceNo').value = sequenceNo;
+    document.getElementById('recordAttributeId').value = attributeId;
+    document.getElementById('recordContent').value = content.replace(/\\n/g, '\n').replace(/\\'/g, "'").replace(/\\"/g, '"');
+
+    recordModal.style.display = 'flex';
+}
+
+// 削除
+async function deleteRecord(sequenceNo) {
+    if (!confirm('この属性レコードを削除しますか？')) return;
+
+    try {
+        const response = await fetch(`/api/attribute-records/${sequenceNo}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            loadRecords();
+        } else {
+            const data = await response.json();
+            alert(`削除に失敗しました: ${data.error}`);
+        }
+    } catch (error) {
+        console.error('削除に失敗:', error);
+        alert('削除に失敗しました');
+    }
+}
+
+// フォーム送信
+recordForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = {
+        attribute_id: parseInt(document.getElementById('recordAttributeId').value),
+        content: document.getElementById('recordContent').value
+    };
+
+    try {
+        let response;
+        if (editingRecordId) {
+            // 更新
+            response = await fetch(`/api/attribute-records/${editingRecordId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+        } else {
+            // 新規作成
+            response = await fetch('/api/attribute-records', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+        }
+
+        if (response.ok) {
+            recordModal.style.display = 'none';
+            loadRecords();
+        } else {
+            const data = await response.json();
+            alert(`保存に失敗しました: ${data.error}`);
+        }
+    } catch (error) {
+        console.error('保存に失敗:', error);
+        alert('保存に失敗しました');
+    }
+});
+
+// モーダルを閉じる
+modalClose.addEventListener('click', () => {
+    recordModal.style.display = 'none';
+});
+
+cancelBtn.addEventListener('click', () => {
+    recordModal.style.display = 'none';
+});
+
+window.addEventListener('click', (e) => {
+    if (e.target === recordModal) {
+        recordModal.style.display = 'none';
+    }
+});
+
+// フィルタ変更
+attributeFilter.addEventListener('change', loadRecords);
+
+// 更新
+refreshRecordsBtn.addEventListener('click', loadRecords);
+
+// ページ読み込み時に読み込み
+loadAttributeMasters().then(() => {
+    loadRecords();
+});
+</script>
+{% endblock %}

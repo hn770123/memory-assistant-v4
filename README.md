@@ -15,9 +15,11 @@ Memory Assistant v4は、ユーザーとの会話から重要な属性情報を�
 
 ## 技術スタック
 
-- **言語**: Python
+- **言語**: Python 3.8+
+- **Webフレームワーク**: Flask 3.0
 - **LLM**: Ollama + llama3.1:8b (デフォルト)
 - **データベース**: SQLite
+- **フロントエンド**: HTML5, CSS3, Vanilla JavaScript
 - **設計思想**: JSON-Schema準拠の構造化出力（詳細は `JSON-Schema-compliant.md` を参照）
 
 ## データ構造
@@ -85,21 +87,49 @@ ollama pull llama3.1:8b
 
 ## 使い方
 
-### 基本的な使い方
+### Webアプリケーション（推奨）
+
+1. 環境変数を設定
+```bash
+# .env.exampleをコピーして.envファイルを作成
+cp .env.example .env
+
+# .envファイルを編集してLLMプロバイダーを設定
+# デフォルトはモックLLMで動作します
+```
+
+2. Webアプリケーションを起動
+```bash
+python app.py
+```
+
+3. ブラウザで http://localhost:5000 にアクセス
+
+### 利用可能な画面
+
+- **チャット画面** (`/chat`): リアルタイムステータス表示付きのインタラクティブなチャット
+- **ログ確認画面** (`/logs`): LLMとのすべての送受信記録を表示
+- **属性マスタ保守画面** (`/attribute-masters`): 属性の追加・変更・削除を管理
+- **属性テーブル保守画面** (`/attribute-records`): 属性データの追加・変更・削除、統合機能
+
+### プログラムからの使用（上級者向け）
 
 ```python
 from src.chat_service import ChatService
-from llm_config import LLMConfig
+from src.database import Database
+from src.llm_client import OllamaClient
 
-# LLMクライアントを初期化
-extractor = LLMConfig.from_env()
+# データベースとLLMクライアントを初期化
+db = Database()
+db.initialize()
+llm_client = OllamaClient()
 
 # チャットサービスを開始
-chat_service = ChatService(extractor)
+chat_service = ChatService(llm_client, db)
 
 # チャット開始
 response = chat_service.process_user_input("こんにちは、私はエンジニアです")
-print(response)
+print(response.response_text)
 ```
 
 ### チャットワークフロー
@@ -146,17 +176,33 @@ pytest tests/
 
 ```
 memory-assistant-v4/
+├── app.py                  # Flaskアプリケーション
 ├── src/
 │   ├── __init__.py
 │   ├── models.py           # データモデル定義
 │   ├── database.py         # データベース操作
 │   ├── llm_client.py       # LLMクライアント
 │   └── chat_service.py     # チャットサービスロジック
+├── templates/              # HTMLテンプレート
+│   ├── base.html
+│   ├── index.html
+│   ├── chat.html
+│   ├── logs.html
+│   ├── attribute_masters.html
+│   └── attribute_records.html
+├── static/                 # 静的ファイル
+│   ├── css/
+│   │   └── style.css
+│   └── js/
+│       └── main.js
 ├── tests/
 │   ├── __init__.py
 │   └── test_chat_workflow.py
+├── requirements.txt        # 依存パッケージ
+├── .env.example            # 環境変数サンプル
 ├── llm_config.py           # LLM設定管理
 ├── design.md               # 設計ドキュメント
+├── DIAGRAMS.md             # システム図解
 ├── JSON-Schema-compliant.md
 └── README.md
 ```

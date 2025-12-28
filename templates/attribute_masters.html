@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block title %}属性マスタ保守 - Memory Assistant v4{% endblock %}
+{% block nav_masters %}active{% endblock %}
+
+{% block content %}
+<div class="masters-container">
+    <div class="masters-header">
+        <h1>属性マスタ保守</h1>
+        <div class="button-group">
+            <button id="addMasterBtn" class="btn btn-primary">新規追加</button>
+            <button id="initDefaultsBtn" class="btn btn-secondary">デフォルト属性を初期化</button>
+            <button id="refreshMastersBtn" class="btn btn-secondary">更新</button>
+        </div>
+    </div>
+
+    <div class="masters-info">
+        <p>属性マスタは、ユーザーから抽出する属性の定義を管理します</p>
+    </div>
+
+    <div id="mastersContainer" class="masters-list">
+        <p class="loading">読み込み中...</p>
+    </div>
+</div>
+
+<!-- モーダル: 属性マスタ編集 -->
+<div id="masterModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle">属性マスタ</h2>
+            <button class="modal-close" id="modalClose">&times;</button>
+        </div>
+        <form id="masterForm">
+            <input type="hidden" id="attributeId">
+
+            <div class="form-group">
+                <label for="attributeName">属性名 <span class="required">*</span></label>
+                <input type="text" id="attributeName" required>
+            </div>
+
+            <div class="form-group">
+                <label for="extractionPrompt">抽出プロンプト <span class="required">*</span></label>
+                <textarea id="extractionPrompt" rows="4" required></textarea>
+                <small>ユーザー入力から属性を抽出するためのプロンプト</small>
+            </div>
+
+            <div class="form-group">
+                <label for="judgmentPrompt">判定プロンプト <span class="required">*</span></label>
+                <textarea id="judgmentPrompt" rows="4" required></textarea>
+                <small>応答に属性が必要かを判定するためのプロンプト</small>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="cancelBtn">キャンセル</button>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const mastersContainer = document.getElementById('mastersContainer');
+const addMasterBtn = document.getElementById('addMasterBtn');
+const initDefaultsBtn = document.getElementById('initDefaultsBtn');
+const refreshMastersBtn = document.getElementById('refreshMastersBtn');
+const masterModal = document.getElementById('masterModal');
+const modalTitle = document.getElementById('modalTitle');
+const masterForm = document.getElementById('masterForm');
+const modalClose = document.getElementById('modalClose');
+const cancelBtn = document.getElementById('cancelBtn');
+
+let editingMasterId = null;
+
+// 属性マスタを読み込み
+async function loadMasters() {
+    mastersContainer.innerHTML = '<p class="loading">読み込み中...</p>';
+
+    try {
+        const response = await fetch('/api/attribute-masters');
+        const data = await response.json();
+
+        if (data.masters.length === 0) {
+            mastersContainer.innerHTML = '<p class="no-data">属性マスタがありません。「デフォルト属性を初期化」または「新規追加」してください。</p>';
+            return;
+        }
+
+        mastersContainer.innerHTML = '';
+
+        const table = document.createElement('table');
+        table.className = 'data-table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>属性名</th>
+                    <th>抽出プロンプト</th>
+                    <th>判定プロンプト</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="mastersTableBody"></tbody>
+        `;
+
+        mastersContainer.appendChild(table);
+
+        const tbody = document.getElementById('mastersTableBody');
+
+        data.masters.forEach(master => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${master.attribute_id}</td>
+                <td><strong>${escapeHtml(master.attribute_name)}</strong></td>
+                <td class="truncate">${escapeHtml(master.extraction_prompt)}</td>
+                <td class="truncate">${escapeHtml(master.judgment_prompt)}</td>
+                <td class="actions">
+                    <button class="btn btn-sm btn-secondary" onclick="editMaster(${master.attribute_id})">編集</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteMaster(${master.attribute_id})">削除</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    } catch (error) {
+        console.error('読み込みに失敗:', error);
+        mastersContainer.innerHTML = '<p class="error">読み込みに失敗しました</p>';
+    }
+}
+
+// HTMLエスケープ
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 新規追加
+addMasterBtn.addEventListener('click', () => {
+    editingMasterId = null;
+    modalTitle.textContent = '新規属性マスタ';
+    document.getElementById('attributeId').value = '';
+    document.getElementById('attributeName').value = '';
+    document.getElementById('extractionPrompt').value = '';
+    document.getElementById('judgmentPrompt').value = '';
+    masterModal.style.display = 'flex';
+});
+
+// 編集
+async function editMaster(attributeId) {
+    editingMasterId = attributeId;
+    modalTitle.textContent = '属性マスタ編集';
+
+    try {
+        const response = await fetch(`/api/attribute-masters/${attributeId}`);
+        const master = await response.json();
+
+        document.getElementById('attributeId').value = master.attribute_id;
+        document.getElementById('attributeName').value = master.attribute_name;
+        document.getElementById('extractionPrompt').value = master.extraction_prompt;
+        document.getElementById('judgmentPrompt').value = master.judgment_prompt;
+
+        masterModal.style.display = 'flex';
+    } catch (error) {
+        console.error('読み込みに失敗:', error);
+        alert('属性マスタの読み込みに失敗しました');
+    }
+}
+
+// 削除
+async function deleteMaster(attributeId) {
+    if (!confirm('この属性マスタを削除しますか？')) return;
+
+    try {
+        const response = await fetch(`/api/attribute-masters/${attributeId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            loadMasters();
+        } else {
+            const data = await response.json();
+            alert(`削除に失敗しました: ${data.error}`);
+        }
+    } catch (error) {
+        console.error('削除に失敗:', error);
+        alert('削除に失敗しました');
+    }
+}
+
+// フォーム送信
+masterForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = {
+        attribute_name: document.getElementById('attributeName').value,
+        extraction_prompt: document.getElementById('extractionPrompt').value,
+        judgment_prompt: document.getElementById('judgmentPrompt').value
+    };
+
+    try {
+        let response;
+        if (editingMasterId) {
+            // 更新
+            response = await fetch(`/api/attribute-masters/${editingMasterId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+        } else {
+            // 新規作成
+            response = await fetch('/api/attribute-masters', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+        }
+
+        if (response.ok) {
+            masterModal.style.display = 'none';
+            loadMasters();
+        } else {
+            const data = await response.json();
+            alert(`保存に失敗しました: ${data.error}`);
+        }
+    } catch (error) {
+        console.error('保存に失敗:', error);
+        alert('保存に失敗しました');
+    }
+});
+
+// モーダルを閉じる
+modalClose.addEventListener('click', () => {
+    masterModal.style.display = 'none';
+});
+
+cancelBtn.addEventListener('click', () => {
+    masterModal.style.display = 'none';
+});
+
+window.addEventListener('click', (e) => {
+    if (e.target === masterModal) {
+        masterModal.style.display = 'none';
+    }
+});
+
+// デフォルト属性を初期化
+initDefaultsBtn.addEventListener('click', async () => {
+    if (!confirm('デフォルトの属性マスタを初期化しますか？')) return;
+
+    try {
+        const response = await fetch('/api/attribute-masters/init-defaults', {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            alert(`${data.count}件の属性マスタを追加しました`);
+            loadMasters();
+        }
+    } catch (error) {
+        console.error('初期化に失敗:', error);
+        alert('初期化に失敗しました');
+    }
+});
+
+// 更新
+refreshMastersBtn.addEventListener('click', loadMasters);
+
+// ページ読み込み時に読み込み
+loadMasters();
+</script>
+{% endblock %}
