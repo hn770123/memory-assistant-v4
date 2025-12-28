@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}ホーム - Memory Assistant v4{% endblock %}
+
+{% block content %}
+<div class="welcome-section">
+    <h1>Memory Assistant v4</h1>
+    <p class="lead">SLMを活用した属性ベースのメモリ管理チャットアシスタント</p>
+
+    <div class="features-grid">
+        <div class="feature-card">
+            <h3>チャット</h3>
+            <p>リアルタイムステータス表示付きのインタラクティブなチャット機能</p>
+            <a href="/chat" class="btn btn-primary">チャットを開始</a>
+        </div>
+
+        <div class="feature-card">
+            <h3>ログ確認</h3>
+            <p>LLMとのすべてのやり取りを一覧表示</p>
+            <a href="/logs" class="btn btn-secondary">ログを表示</a>
+        </div>
+
+        <div class="feature-card">
+            <h3>属性マスタ保守</h3>
+            <p>属性の追加・変更・削除を管理</p>
+            <a href="/attribute-masters" class="btn btn-secondary">マスタを管理</a>
+        </div>
+
+        <div class="feature-card">
+            <h3>属性テーブル保守</h3>
+            <p>属性データの追加・変更・削除、統合機能</p>
+            <a href="/attribute-records" class="btn btn-secondary">データを管理</a>
+        </div>
+    </div>
+
+    <div class="info-section">
+        <h2>特徴</h2>
+        <ul>
+            <li><strong>属性ベースのメモリ管理:</strong> ユーザーのプロフィール、興味、予定などの属性を自動抽出・保存</li>
+            <li><strong>2段階プロンプト設計:</strong> 推論タスクと構造化タスクを分離することで、小規模モデルでも高精度な処理を実現</li>
+            <li><strong>リアルタイムステータス表示:</strong> LLMが何のタスクを処理しているかをリアルタイムで表示</li>
+            <li><strong>複数LLMプロバイダー対応:</strong> Ollama、Anthropic Claude、Cloudflare Workersに対応</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

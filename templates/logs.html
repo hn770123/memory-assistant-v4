@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}ログ確認 - Memory Assistant v4{% endblock %}
+{% block nav_logs %}active{% endblock %}
+
+{% block content %}
+<div class="logs-container">
+    <div class="logs-header">
+        <h1>LLMログ確認</h1>
+        <div class="button-group">
+            <button id="refreshLogsBtn" class="btn btn-secondary">更新</button>
+            <button id="clearLogsBtn" class="btn btn-danger">ログをクリア</button>
+        </div>
+    </div>
+
+    <div class="logs-info">
+        <p>LLMとのすべての送受信記録を表示します</p>
+    </div>
+
+    <div id="logsContainer" class="logs-list">
+        <p class="loading">ログを読み込み中...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const logsContainer = document.getElementById('logsContainer');
+const refreshLogsBtn = document.getElementById('refreshLogsBtn');
+const clearLogsBtn = document.getElementById('clearLogsBtn');
+
+// ログを読み込み
+async function loadLogs() {
+    logsContainer.innerHTML = '<p class="loading">ログを読み込み中...</p>';
+
+    try {
+        const response = await fetch('/api/logs');
+        const data = await response.json();
+
+        if (data.logs.length === 0) {
+            logsContainer.innerHTML = '<p class="no-data">ログがありません</p>';
+            return;
+        }
+
+        logsContainer.innerHTML = '';
+
+        data.logs.forEach((log, index) => {
+            const logItem = document.createElement('div');
+            logItem.className = 'log-item';
+
+            const timestamp = new Date().toLocaleString('ja-JP');
+
+            logItem.innerHTML = `
+                <div class="log-header">
+                    <span class="log-type">${escapeHtml(log.type)}</span>
+                    <span class="log-timestamp">${timestamp}</span>
+                </div>
+                <div class="log-content">
+                    <div class="log-section">
+                        <h4>送信 (プロンプト)</h4>
+                        <pre>${escapeHtml(log.prompt)}</pre>
+                    </div>
+                    <div class="log-section">
+                        <h4>受信 (応答)</h4>
+                        <pre>${escapeHtml(log.response)}</pre>
+                    </div>
+                </div>
+            `;
+
+            logsContainer.appendChild(logItem);
+        });
+    } catch (error) {
+        console.error('ログの読み込みに失敗:', error);
+        logsContainer.innerHTML = '<p class="error">ログの読み込みに失敗しました</p>';
+    }
+}
+
+// HTMLエスケープ
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 更新ボタン
+refreshLogsBtn.addEventListener('click', loadLogs);
+
+// クリアボタン
+clearLogsBtn.addEventListener('click', async () => {
+    if (!confirm('すべてのログをクリアしますか？')) return;
+
+    try {
+        const response = await fetch('/api/logs/clear', {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            logsContainer.innerHTML = '<p class="no-data">ログがクリアされました</p>';
+        }
+    } catch (error) {
+        console.error('ログのクリアに失敗:', error);
+    }
+});
+
+// ページ読み込み時にログを読み込み
+loadLogs();
+</script>
+{% endblock %}

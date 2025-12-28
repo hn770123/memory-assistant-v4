@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Memory Assistant v4{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="navbar-brand">
+                <a href="/" class="brand-link">Memory Assistant v4</a>
+            </div>
+            <ul class="navbar-menu">
+                <li><a href="/chat" class="{% block nav_chat %}{% endblock %}">チャット</a></li>
+                <li><a href="/logs" class="{% block nav_logs %}{% endblock %}">ログ確認</a></li>
+                <li><a href="/attribute-masters" class="{% block nav_masters %}{% endblock %}">属性マスタ</a></li>
+                <li><a href="/attribute-records" class="{% block nav_records %}{% endblock %}">属性テーブル</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 Memory Assistant v4 - SLMを活用した属性ベースのメモリ管理チャットアシスタント</p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

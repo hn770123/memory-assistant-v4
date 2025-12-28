@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}チャット - Memory Assistant v4{% endblock %}
+{% block nav_chat %}active{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-header">
+        <h1>チャット</h1>
+        <button id="clearHistoryBtn" class="btn btn-danger">履歴をクリア</button>
+    </div>
+
+    <div class="status-area" id="statusArea">
+        <!-- リアルタイムステータス表示エリア -->
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+        <!-- チャットメッセージが表示される -->
+        <div class="welcome-message">
+            <p>Memory Assistant v4へようこそ！</p>
+            <p>何かお手伝いできることはありますか？</p>
+        </div>
+    </div>
+
+    <div class="chat-input-area">
+        <form id="chatForm">
+            <input
+                type="text"
+                id="messageInput"
+                placeholder="メッセージを入力..."
+                autocomplete="off"
+                required
+            >
+            <button type="submit" class="btn btn-primary" id="sendBtn">送信</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const chatForm = document.getElementById('chatForm');
+const messageInput = document.getElementById('messageInput');
+const chatMessages = document.getElementById('chatMessages');
+const statusArea = document.getElementById('statusArea');
+const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+const sendBtn = document.getElementById('sendBtn');
+
+// チャット履歴を読み込み
+async function loadChatHistory() {
+    try {
+        const response = await fetch('/api/chat/history');
+        const data = await response.json();
+
+        // ウェルカムメッセージをクリア
+        const welcomeMsg = chatMessages.querySelector('.welcome-message');
+        if (welcomeMsg && data.history.length > 0) {
+            welcomeMsg.remove();
+        }
+
+        // 履歴を表示
+        data.history.forEach(msg => {
+            appendMessage(msg.role, msg.content);
+        });
+    } catch (error) {
+        console.error('履歴の読み込みに失敗:', error);
+    }
+}
+
+// メッセージを追加
+function appendMessage(role, content) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${role}-message`;
+
+    const roleLabel = role === 'user' ? 'あなた' : 'アシスタント';
+    messageDiv.innerHTML = `
+        <div class="message-header">${roleLabel}</div>
+        <div class="message-content">${escapeHtml(content)}</div>
+    `;
+
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// ステータスを表示
+function showStatus(statuses) {
+    statusArea.innerHTML = '';
+
+    if (!statuses || statuses.length === 0) return;
+
+    const statusList = document.createElement('div');
+    statusList.className = 'status-list';
+
+    statuses.forEach(status => {
+        const statusItem = document.createElement('div');
+        statusItem.className = `status-item status-${status.status}`;
+        statusItem.textContent = status.display_text;
+        statusList.appendChild(statusItem);
+    });
+
+    statusArea.appendChild(statusList);
+}
+
+// ステータスをクリア
+function clearStatus() {
+    statusArea.innerHTML = '';
+}
+
+// HTMLエスケープ
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// チャット送信
+chatForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const message = messageInput.value.trim();
+    if (!message) return;
+
+    // ウェルカムメッセージをクリア
+    const welcomeMsg = chatMessages.querySelector('.welcome-message');
+    if (welcomeMsg) {
+        welcomeMsg.remove();
+    }
+
+    // ユーザーメッセージを表示
+    appendMessage('user', message);
+    messageInput.value = '';
+
+    // 送信ボタンを無効化
+    sendBtn.disabled = true;
+    sendBtn.textContent = '処理中...';
+
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // ステータスを表示（アニメーション用）
+            if (data.statuses) {
+                showStatus(data.statuses);
+                // 3秒後にクリア
+                setTimeout(clearStatus, 3000);
+            }
+
+            // アシスタントの応答を表示
+            appendMessage('assistant', data.response);
+
+            // 使用された属性と抽出された属性を表示（デバッグ用）
+            if (data.used_attributes && Object.keys(data.used_attributes).length > 0) {
+                console.log('使用された属性:', data.used_attributes);
+            }
+            if (data.extracted_attributes && data.extracted_attributes.length > 0) {
+                console.log('抽出された属性:', data.extracted_attributes);
+            }
+        } else {
+            appendMessage('system', `エラー: ${data.error}`);
+        }
+    } catch (error) {
+        console.error('送信エラー:', error);
+        appendMessage('system', 'メッセージの送信に失敗しました');
+    } finally {
+        // 送信ボタンを有効化
+        sendBtn.disabled = false;
+        sendBtn.textContent = '送信';
+    }
+});
+
+// 履歴クリア
+clearHistoryBtn.addEventListener('click', async () => {
+    if (!confirm('チャット履歴をクリアしますか？')) return;
+
+    try {
+        const response = await fetch('/api/chat/clear', {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            chatMessages.innerHTML = `
+                <div class="welcome-message">
+                    <p>履歴がクリアされました</p>
+                    <p>何かお手伝いできることはありますか？</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('履歴のクリアに失敗:', error);
+    }
+});
+
+// ページ読み込み時に履歴を読み込み
+loadChatHistory();
+</script>
+{% endblock %}
