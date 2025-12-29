@@ -30,20 +30,6 @@ async function handleApiError(response) {
     return response;
 }
 
-/**
- * 確認ダイアログ
- */
-function confirm(message) {
-    return window.confirm(message);
-}
-
-/**
- * アラート
- */
-function alert(message) {
-    window.alert(message);
-}
-
 // ページ読み込み完了時の処理
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Memory Assistant v4 - アプリケーション起動');
