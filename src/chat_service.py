@@ -7,6 +7,10 @@ design.md で定義されたフローを実装:
 3. チャット履歴 ＋ ユーザーの入力 + 抽出された属性データ を元に応答文を生成
 4. 画面にチャットの応答を表示
 5. 応答の表示が完了したら、ユーザーの入力から属性を抽出・登録
+
+翻訳パイプライン:
+- ユーザー入力（日本語）→ 英語に翻訳 → LLM処理 → 応答を日本語に翻訳 → 出力
+- 翻訳時には直近2つのメッセージをコンテキストとして使用
 """
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -15,6 +19,7 @@ from typing import Optional, Callable, Generator
 from .models import AttributeMaster, AttributeRecord, ChatMessage, LLMTaskStatus
 from .database import Database
 from .llm_client import LLMClient
+from .translation_service import TranslationService
 
 
 @dataclass
@@ -33,10 +38,12 @@ class ChatService:
         self,
         llm_client: LLMClient,
         database: Database,
+        translation_service: Optional[TranslationService] = None,
         status_callback: Optional[Callable[[LLMTaskStatus], None]] = None
     ):
         self.llm = llm_client
         self.db = database
+        self.translation_service = translation_service
         self.status_callback = status_callback
         self.chat_history: list[ChatMessage] = []
 
@@ -54,7 +61,21 @@ class ChatService:
         """
         task_statuses: list[LLMTaskStatus] = []
 
-        # チャット履歴にユーザー入力を追加
+        # 翻訳パイプライン: ユーザー入力を英語に翻訳
+        user_input_en = user_input
+        if self.translation_service:
+            # 直近2つのメッセージをコンテキストとして使用
+            context_messages = [
+                {"role": msg.role, "content": msg.content}
+                for msg in self.chat_history[-2:]
+            ] if len(self.chat_history) > 0 else None
+
+            user_input_en = self.translation_service.translate_ja_to_en(
+                user_input,
+                context_messages
+            )
+
+        # チャット履歴にユーザー入力を追加（日本語で保存）
         self.chat_history.append(ChatMessage(role="user", content=user_input))
 
         # === Step 1 & 2: 属性の判定と抽出 ===
@@ -62,7 +83,7 @@ class ChatService:
         required_attributes: dict[str, str] = {}
 
         for master in masters:
-            # Step 1: 判定
+            # Step 1: 判定（英語の入力を使用）
             status = LLMTaskStatus(
                 task_type="judgment",
                 attribute_name=master.attribute_name,
@@ -71,7 +92,7 @@ class ChatService:
             task_statuses.append(status)
             self._emit_status(status)
 
-            is_required = self.llm.judge(master.judgment_prompt, user_input, master.attribute_name)
+            is_required = self.llm.judge(master.judgment_prompt, user_input_en, master.attribute_name)
 
             status.status = "completed"
             self._emit_status(status)
@@ -102,21 +123,46 @@ class ChatService:
         task_statuses.append(status)
         self._emit_status(status)
 
-        history_for_llm = [
-            {"role": msg.role, "content": msg.content}
-            for msg in self.chat_history[:-1]  # 現在の入力を除く
-        ]
+        # チャット履歴を英語に翻訳（翻訳サービスが有効な場合）
+        if self.translation_service:
+            history_for_llm = []
+            for msg in self.chat_history[-5:]:  # 直近5件
+                translated_content = self.translation_service.translate_ja_to_en(
+                    msg.content,
+                    None  # 履歴の翻訳時はコンテキスト不要
+                )
+                history_for_llm.append({"role": msg.role, "content": translated_content})
+        else:
+            history_for_llm = [
+                {"role": msg.role, "content": msg.content}
+                for msg in self.chat_history[:-1]  # 現在の入力を除く
+            ]
 
-        response_text = self.llm.generate_response(
+        response_text_en = self.llm.generate_response(
             chat_history=history_for_llm,
-            user_input=user_input,
+            user_input=user_input_en,
             attributes=required_attributes
         )
+
+        # 応答を日本語に翻訳
+        if self.translation_service:
+            # 直近2つのメッセージをコンテキストとして使用
+            context_messages = [
+                {"role": msg.role, "content": msg.content}
+                for msg in self.chat_history[-2:]
+            ] if len(self.chat_history) > 0 else None
+
+            response_text = self.translation_service.translate_en_to_ja(
+                response_text_en,
+                context_messages
+            )
+        else:
+            response_text = response_text_en
 
         status.status = "completed"
         self._emit_status(status)
 
-        # チャット履歴にアシスタント応答を追加
+        # チャット履歴にアシスタント応答を追加（日本語で保存）
         self.chat_history.append(ChatMessage(role="assistant", content=response_text))
 
         # === Step 4: 応答を返す（表示は呼び出し側で行う） ===
@@ -133,7 +179,8 @@ class ChatService:
             task_statuses.append(status)
             self._emit_status(status)
 
-            extracted = self.llm.extract(master.extraction_prompt, user_input, master.attribute_name)
+            # 英語の入力を使用して属性を抽出
+            extracted = self.llm.extract(master.extraction_prompt, user_input_en, master.attribute_name)
 
             if extracted:
                 # 属性レコードを登録
@@ -171,7 +218,21 @@ class ChatService:
         """
         task_statuses: list[LLMTaskStatus] = []
 
-        # チャット履歴にユーザー入力を追加
+        # 翻訳パイプライン: ユーザー入力を英語に翻訳
+        user_input_en = user_input
+        if self.translation_service:
+            # 直近2つのメッセージをコンテキストとして使用
+            context_messages = [
+                {"role": msg.role, "content": msg.content}
+                for msg in self.chat_history[-2:]
+            ] if len(self.chat_history) > 0 else None
+
+            user_input_en = self.translation_service.translate_ja_to_en(
+                user_input,
+                context_messages
+            )
+
+        # チャット履歴にユーザー入力を追加（日本語で保存）
         self.chat_history.append(ChatMessage(role="user", content=user_input))
 
         # === Step 1 & 2: 属性の判定と抽出 ===
@@ -179,7 +240,7 @@ class ChatService:
         required_attributes: dict[str, str] = {}
 
         for master in masters:
-            # Step 1: 判定
+            # Step 1: 判定（英語の入力を使用）
             status = LLMTaskStatus(
                 task_type="judgment",
                 attribute_name=master.attribute_name,
@@ -188,7 +249,7 @@ class ChatService:
             task_statuses.append(status)
             yield status
 
-            is_required = self.llm.judge(master.judgment_prompt, user_input, master.attribute_name)
+            is_required = self.llm.judge(master.judgment_prompt, user_input_en, master.attribute_name)
 
             status.status = "completed"
             yield status
@@ -218,20 +279,46 @@ class ChatService:
         task_statuses.append(status)
         yield status
 
-        history_for_llm = [
-            {"role": msg.role, "content": msg.content}
-            for msg in self.chat_history[:-1]
-        ]
+        # チャット履歴を英語に翻訳（翻訳サービスが有効な場合）
+        if self.translation_service:
+            history_for_llm = []
+            for msg in self.chat_history[-5:]:  # 直近5件
+                translated_content = self.translation_service.translate_ja_to_en(
+                    msg.content,
+                    None  # 履歴の翻訳時はコンテキスト不要
+                )
+                history_for_llm.append({"role": msg.role, "content": translated_content})
+        else:
+            history_for_llm = [
+                {"role": msg.role, "content": msg.content}
+                for msg in self.chat_history[:-1]
+            ]
 
-        response_text = self.llm.generate_response(
+        response_text_en = self.llm.generate_response(
             chat_history=history_for_llm,
-            user_input=user_input,
+            user_input=user_input_en,
             attributes=required_attributes
         )
+
+        # 応答を日本語に翻訳
+        if self.translation_service:
+            # 直近2つのメッセージをコンテキストとして使用
+            context_messages = [
+                {"role": msg.role, "content": msg.content}
+                for msg in self.chat_history[-2:]
+            ] if len(self.chat_history) > 0 else None
+
+            response_text = self.translation_service.translate_en_to_ja(
+                response_text_en,
+                context_messages
+            )
+        else:
+            response_text = response_text_en
 
         status.status = "completed"
         yield status
 
+        # チャット履歴にアシスタント応答を追加（日本語で保存）
         self.chat_history.append(ChatMessage(role="assistant", content=response_text))
 
         # === Step 5: 属性抽出・登録 ===
@@ -246,7 +333,8 @@ class ChatService:
             task_statuses.append(status)
             yield status
 
-            extracted = self.llm.extract(master.extraction_prompt, user_input, master.attribute_name)
+            # 英語の入力を使用して属性を抽出
+            extracted = self.llm.extract(master.extraction_prompt, user_input_en, master.attribute_name)
 
             if extracted:
                 record = AttributeRecord(

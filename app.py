@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from src.database import Database
 from src.chat_service import ChatService, create_default_attribute_masters
 from src.llm_client import MockLLMClient, OllamaClient, LLMResponse
+from src.translation_service import TranslationService
 from src.models import AttributeMaster, AttributeRecord, LLMLog
 from datetime import datetime
 import json
@@ -74,8 +75,17 @@ def llm_log_callback(prompt: str, response: LLMResponse, task_type: str, attribu
 # LLMクライアントにログコールバックを設定
 llm_client.set_log_callback(llm_log_callback)
 
+# 翻訳サービス初期化
+translation_enabled = os.environ.get("ENABLE_TRANSLATION", "true").lower() == "true"
+translation_service = None
+if translation_enabled:
+    translation_service = TranslationService(llm_client)
+    print("Translation service enabled: Japanese <-> English")
+else:
+    print("Translation service disabled")
+
 # チャットサービス初期化
-chat_service = ChatService(llm_client, db)
+chat_service = ChatService(llm_client, db, translation_service)
 
 
 # ================
