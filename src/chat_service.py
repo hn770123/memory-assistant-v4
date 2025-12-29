@@ -64,19 +64,20 @@ class ChatService:
         # 翻訳パイプライン: ユーザー入力を英語に翻訳
         user_input_en = user_input
         if self.translation_service:
-            # 直近2つのメッセージをコンテキストとして使用
-            context_messages = [
-                {"role": msg.role, "content": msg.content}
+            # 日本語→英語翻訳時：直近2件の英語メッセージをコンテキストとして使用
+            context_messages_en = [
+                {"role": msg.role, "content": msg.content_en}
                 for msg in self.chat_history[-2:]
+                if msg.content_en is not None
             ] if len(self.chat_history) > 0 else None
 
             user_input_en = self.translation_service.translate_ja_to_en(
                 user_input,
-                context_messages
+                context_messages_en if context_messages_en else None
             )
 
-        # チャット履歴にユーザー入力を追加（日本語で保存）
-        self.chat_history.append(ChatMessage(role="user", content=user_input))
+        # チャット履歴にユーザー入力を追加（日本語と英語の両方を保存）
+        self.chat_history.append(ChatMessage(role="user", content=user_input, content_en=user_input_en))
 
         # === Step 1 & 2: 属性の判定と抽出 ===
         masters = self.db.get_all_attribute_masters()
@@ -146,15 +147,15 @@ class ChatService:
 
         # 応答を日本語に翻訳
         if self.translation_service:
-            # 直近2つのメッセージをコンテキストとして使用
-            context_messages = [
+            # 英語→日本語翻訳時：直近2件の日本語メッセージをコンテキストとして使用
+            context_messages_ja = [
                 {"role": msg.role, "content": msg.content}
                 for msg in self.chat_history[-2:]
             ] if len(self.chat_history) > 0 else None
 
             response_text = self.translation_service.translate_en_to_ja(
                 response_text_en,
-                context_messages
+                context_messages_ja if context_messages_ja else None
             )
         else:
             response_text = response_text_en
@@ -162,8 +163,8 @@ class ChatService:
         status.status = "completed"
         self._emit_status(status)
 
-        # チャット履歴にアシスタント応答を追加（日本語で保存）
-        self.chat_history.append(ChatMessage(role="assistant", content=response_text))
+        # チャット履歴にアシスタント応答を追加（日本語と英語の両方を保存）
+        self.chat_history.append(ChatMessage(role="assistant", content=response_text, content_en=response_text_en))
 
         # === Step 4: 応答を返す（表示は呼び出し側で行う） ===
 
@@ -221,19 +222,20 @@ class ChatService:
         # 翻訳パイプライン: ユーザー入力を英語に翻訳
         user_input_en = user_input
         if self.translation_service:
-            # 直近2つのメッセージをコンテキストとして使用
-            context_messages = [
-                {"role": msg.role, "content": msg.content}
+            # 日本語→英語翻訳時：直近2件の英語メッセージをコンテキストとして使用
+            context_messages_en = [
+                {"role": msg.role, "content": msg.content_en}
                 for msg in self.chat_history[-2:]
+                if msg.content_en is not None
             ] if len(self.chat_history) > 0 else None
 
             user_input_en = self.translation_service.translate_ja_to_en(
                 user_input,
-                context_messages
+                context_messages_en if context_messages_en else None
             )
 
-        # チャット履歴にユーザー入力を追加（日本語で保存）
-        self.chat_history.append(ChatMessage(role="user", content=user_input))
+        # チャット履歴にユーザー入力を追加（日本語と英語の両方を保存）
+        self.chat_history.append(ChatMessage(role="user", content=user_input, content_en=user_input_en))
 
         # === Step 1 & 2: 属性の判定と抽出 ===
         masters = self.db.get_all_attribute_masters()
@@ -302,15 +304,15 @@ class ChatService:
 
         # 応答を日本語に翻訳
         if self.translation_service:
-            # 直近2つのメッセージをコンテキストとして使用
-            context_messages = [
+            # 英語→日本語翻訳時：直近2件の日本語メッセージをコンテキストとして使用
+            context_messages_ja = [
                 {"role": msg.role, "content": msg.content}
                 for msg in self.chat_history[-2:]
             ] if len(self.chat_history) > 0 else None
 
             response_text = self.translation_service.translate_en_to_ja(
                 response_text_en,
-                context_messages
+                context_messages_ja if context_messages_ja else None
             )
         else:
             response_text = response_text_en
@@ -318,8 +320,8 @@ class ChatService:
         status.status = "completed"
         yield status
 
-        # チャット履歴にアシスタント応答を追加（日本語で保存）
-        self.chat_history.append(ChatMessage(role="assistant", content=response_text))
+        # チャット履歴にアシスタント応答を追加（日本語と英語の両方を保存）
+        self.chat_history.append(ChatMessage(role="assistant", content=response_text, content_en=response_text_en))
 
         # === Step 5: 属性抽出・登録 ===
         extracted_attributes: list[tuple[str, str]] = []

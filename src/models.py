@@ -46,9 +46,13 @@ class AttributeRecord:
 
 @dataclass
 class ChatMessage:
-    """チャットメッセージ"""
+    """チャットメッセージ
+
+    日本語と英語の両方のコンテンツを保持
+    """
     role: str  # "user" or "assistant"
-    content: str
+    content: str  # 日本語コンテンツ
+    content_en: Optional[str] = None  # 英語コンテンツ
     timestamp: datetime = field(default_factory=datetime.now)
 
 
