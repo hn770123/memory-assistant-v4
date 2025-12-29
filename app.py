@@ -208,28 +208,39 @@ def api_chat_stream():
             while True:
                 try:
                     status = next(gen)
-                    event_data = {
-                        "type": "status",
-                        "data": {
-                            "task_type": status.task_type,
-                            "attribute_name": status.attribute_name,
-                            "status": status.status,
-                            "display_text": status.display_text
+
+                    # 応答準備完了の場合は即座に応答を送信
+                    if status.task_type == "response_ready":
+                        response_data = {
+                            "type": "response",
+                            "data": {
+                                "response": status.response_text,
+                                "used_attributes": status.used_attributes
+                            }
                         }
-                    }
-                    yield f"data: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+                        yield f"data: {json.dumps(response_data, ensure_ascii=False)}\n\n"
+                    else:
+                        # 通常のステータス
+                        event_data = {
+                            "type": "status",
+                            "data": {
+                                "task_type": status.task_type,
+                                "attribute_name": status.attribute_name,
+                                "status": status.status,
+                                "display_text": status.display_text
+                            }
+                        }
+                        yield f"data: {json.dumps(event_data, ensure_ascii=False)}\n\n"
                 except StopIteration as e:
-                    # 最終的な応答を送信
+                    # 属性抽出の完了を通知（応答は既にresponse_readyで送信済み）
                     response = e.value
-                    final_data = {
-                        "type": "response",
+                    completion_data = {
+                        "type": "extraction_complete",
                         "data": {
-                            "response": response.response_text,
-                            "used_attributes": response.used_attributes,
                             "extracted_attributes": response.extracted_attributes
                         }
                     }
-                    yield f"data: {json.dumps(final_data, ensure_ascii=False)}\n\n"
+                    yield f"data: {json.dumps(completion_data, ensure_ascii=False)}\n\n"
                     break
 
             # 完了通知

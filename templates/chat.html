@@ -92,7 +92,8 @@ function showStatus(statuses) {
     const statusList = document.createElement('div');
     statusList.className = 'status-list';
 
-    statuses.forEach(status => {
+    // 処理中のステータスのみを表示（completedは非表示）
+    statuses.filter(s => s.status === 'processing').forEach(status => {
         const statusItem = document.createElement('div');
         statusItem.className = `status-item status-${status.status}`;
         statusItem.textContent = status.display_text;
@@ -172,7 +173,7 @@ chatForm.addEventListener('submit', async (e) => {
                     currentStatuses.push(data.data);
                     showStatus(currentStatuses);
                 } else if (data.type === 'response') {
-                    // 最終応答を表示
+                    // 応答を即座に表示
                     clearStatus();
                     appendMessage('assistant', data.data.response);
 
@@ -180,6 +181,8 @@ chatForm.addEventListener('submit', async (e) => {
                     if (data.data.used_attributes && Object.keys(data.data.used_attributes).length > 0) {
                         console.log('使用された属性:', data.data.used_attributes);
                     }
+                } else if (data.type === 'extraction_complete') {
+                    // 属性抽出完了（デバッグ情報のみ）
                     if (data.data.extracted_attributes && data.data.extracted_attributes.length > 0) {
                         console.log('抽出された属性:', data.data.extracted_attributes);
                     }

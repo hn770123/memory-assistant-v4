@@ -40,14 +40,11 @@ class TranslationService:
                 context_text += f"{role}: {msg['content']}\n"
             context_text += "</Recent Conversation Context>\n\n"
 
-        prompt = f"""You are a professional translator. Translate the following Japanese text to English.
-Maintain the original meaning, tone, and nuance as accurately as possible.
+        prompt = f"""Translate the Japanese text to English. Output only the translation.
 {context_text}
 <Japanese Text>
 {text}
-</Japanese Text>
-
-English Translation:"""
+</Japanese Text>"""
 
         response = self.llm_client.generate(prompt, task_type="translation_ja_to_en")
         return response.content.strip()
@@ -76,15 +73,11 @@ English Translation:"""
                 context_text += f"{role}: {msg['content']}\n"
             context_text += "</Recent Conversation Context>\n\n"
 
-        prompt = f"""You are a professional translator. Translate the following English text to Japanese.
-Maintain the original meaning, tone, and nuance as accurately as possible.
-Use natural Japanese expressions.
+        prompt = f"""Translate the English text to Japanese. Output only the translation.
 {context_text}
 <English Text>
 {text}
-</English Text>
-
-Japanese Translation:"""
+</English Text>"""
 
         response = self.llm_client.generate(prompt, task_type="translation_en_to_ja")
         return response.content.strip()

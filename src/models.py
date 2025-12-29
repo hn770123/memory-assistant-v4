@@ -59,17 +59,21 @@ class ChatMessage:
 @dataclass
 class LLMTaskStatus:
     """LLMタスクのステータス"""
-    task_type: str  # "judgment", "extraction", "response", "attribute_extraction"
+    task_type: str  # "translation_input", "judgment", "response", "translation_response", "response_ready", "attribute_extraction"
     attribute_name: Optional[str] = None
     status: str = "processing"  # "processing", "completed", "failed"
+    response_text: Optional[str] = None  # "response_ready"タイプの場合に応答テキストを含む
+    used_attributes: Optional[dict] = None  # "response_ready"タイプの場合に使用された属性を含む
 
     @property
     def display_text(self) -> str:
         """ステータス表示用テキスト"""
         task_descriptions = {
+            "translation_input": "ユーザー入力を英語に翻訳中",
             "judgment": f"属性「{self.attribute_name}」が応答に必要か判定中",
-            "extraction": f"属性「{self.attribute_name}」のデータを抽出中",
             "response": "応答文を生成中",
+            "translation_response": "応答を日本語に翻訳中",
+            "response_ready": "応答準備完了",
             "attribute_extraction": f"ユーザー入力から「{self.attribute_name}」を抽出中",
         }
         return task_descriptions.get(self.task_type, "処理中")
@@ -81,7 +85,7 @@ class LLMLog:
     log_id: Optional[int]
     timestamp: datetime
     model: str
-    task_type: str  # "judgment", "extraction", "response", "attribute_extraction"
+    task_type: str  # "judgment", "response", "attribute_extraction", "translation_ja_to_en", "translation_en_to_ja"
     prompt: str  # LLMに送信した完全なプロンプト
     response: str  # LLMからの応答テキスト
     raw_response: Optional[str] = None  # JSON形式のraw response
