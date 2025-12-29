@@ -45,22 +45,22 @@ class LLMClient(ABC):
 
         返り値: True = 必要、False = 不要
         """
-        prompt = f"""あなたは判定を行うアシスタントです。
-以下の質問に「はい」または「いいえ」のみで答えてください。
+        prompt = f"""You are an assistant that makes judgments.
+Please answer the following question with only 'yes' or 'no'.
 
-<判定の質問>
+<Judgment Question>
 {judgment_prompt}
-</判定の質問>
+</Judgment Question>
 
-<ユーザーの入力>
+<User Input>
 {user_input}
-</ユーザーの入力>
+</User Input>
 
-回答（「はい」または「いいえ」のみ）:"""
+Answer (only 'yes' or 'no'):"""
 
         response = self.generate(prompt, task_type="judgment", attribute_name=attribute_name)
         answer = response.content.strip().lower()
-        return "はい" in answer or "yes" in answer
+        return "yes" in answer or "はい" in answer
 
     def extract(self, extraction_prompt: str, user_input: str, attribute_name: Optional[str] = None) -> Optional[str]:
         """
@@ -68,23 +68,23 @@ class LLMClient(ABC):
 
         抽出できなかった場合はNoneを返す
         """
-        prompt = f"""あなたは情報抽出を行うアシスタントです。
+        prompt = f"""You are an assistant that extracts information.
 
-<抽出指示>
+<Extraction Instructions>
 {extraction_prompt}
-</抽出指示>
+</Extraction Instructions>
 
-<ユーザーの入力>
+<User Input>
 {user_input}
-</ユーザーの入力>
+</User Input>
 
-抽出する情報がない場合は「なし」と回答してください。
-抽出された内容:"""
+If there is no information to extract, please respond with 'none'.
+Extracted content:"""
 
         response = self.generate(prompt, task_type="extraction", attribute_name=attribute_name)
         content = response.content.strip()
 
-        if content == "なし" or content == "" or "なし" in content[:10]:
+        if content.lower() == "none" or content == "" or "none" in content[:10].lower() or content == "なし" or "なし" in content[:10]:
             return None
         return content
 
@@ -99,28 +99,28 @@ class LLMClient(ABC):
         """
         history_text = ""
         for msg in chat_history[-5:]:  # 直近5件
-            role = "ユーザー" if msg["role"] == "user" else "アシスタント"
+            role = "User" if msg["role"] == "user" else "Assistant"
             history_text += f"{role}: {msg['content']}\n"
 
         attributes_text = ""
         if attributes:
-            attributes_text = "\n<ユーザーの属性情報>\n"
+            attributes_text = "\n<User Attribute Information>\n"
             for name, value in attributes.items():
                 attributes_text += f"- {name}: {value}\n"
-            attributes_text += "</ユーザーの属性情報>\n"
+            attributes_text += "</User Attribute Information>\n"
 
-        prompt = f"""あなたは親切なアシスタントです。
-ユーザーの属性情報を考慮して、適切な応答を生成してください。
+        prompt = f"""You are a helpful assistant.
+Please generate an appropriate response considering the user's attribute information.
 {attributes_text}
-<会話履歴>
+<Conversation History>
 {history_text}
-</会話履歴>
+</Conversation History>
 
-<ユーザーの入力>
+<User Input>
 {user_input}
-</ユーザーの入力>
+</User Input>
 
-応答:"""
+Response:"""
 
         response = self.generate(prompt, task_type="response")
         return response.content.strip()
@@ -202,10 +202,10 @@ class MockLLMClient(LLMClient):
 
     def _check_attribute_context(self, prompt: str, attr_name: str) -> bool:
         """プロンプトに属性のコンテキストが含まれているか確認"""
-        # プロフィール判定パターン
-        if "プロフィール" in attr_name.lower():
-            patterns = ["プロフィール", "職業", "仕事", "年齢", "名前", "住んでいる"]
-            return any(p in prompt for p in patterns)
+        # User Profile判定パターン
+        if "user profile" in attr_name.lower() or "プロフィール" in attr_name.lower():
+            patterns = ["profile", "occupation", "job", "age", "name", "プロフィール", "職業", "仕事", "年齢", "名前"]
+            return any(p in prompt.lower() for p in patterns)
         return False
 
     def judge(self, judgment_prompt: str, user_input: str, attribute_name: Optional[str] = None) -> bool:
