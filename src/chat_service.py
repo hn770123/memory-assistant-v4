@@ -10,7 +10,7 @@ design.md で定義されたフローを実装:
 
 翻訳パイプライン:
 - ユーザー入力（日本語）→ 英語に翻訳 → LLM処理 → 応答を日本語に翻訳 → 出力
-- 翻訳時には直近2つのメッセージをコンテキストとして使用
+- 翻訳時には直近2つのメッセージの英語版をコンテキストとして使用
 """
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -152,15 +152,15 @@ class ChatService:
             task_statuses.append(status)
             self._emit_status(status)
 
-            # 英語→日本語翻訳時：直近2件の日本語メッセージをコンテキストとして使用
-            context_messages_ja = [
-                {"role": msg.role, "content": msg.content}
+            # 英語→日本語翻訳時：直近2件の英語メッセージをコンテキストとして使用
+            context_messages_en = [
+                {"role": msg.role, "content": msg.content_en if msg.content_en else msg.content}
                 for msg in self.chat_history[-2:]
             ] if len(self.chat_history) > 0 else None
 
             response_text = self.translation_service.translate_en_to_ja(
                 response_text_en,
-                context_messages_ja if context_messages_ja else None
+                context_messages_en if context_messages_en else None
             )
 
             status.status = "completed"
@@ -315,15 +315,15 @@ class ChatService:
             task_statuses.append(status)
             yield status
 
-            # 英語→日本語翻訳時：直近2件の日本語メッセージをコンテキストとして使用
-            context_messages_ja = [
-                {"role": msg.role, "content": msg.content}
+            # 英語→日本語翻訳時：直近2件の英語メッセージをコンテキストとして使用
+            context_messages_en = [
+                {"role": msg.role, "content": msg.content_en if msg.content_en else msg.content}
                 for msg in self.chat_history[-2:]
             ] if len(self.chat_history) > 0 else None
 
             response_text = self.translation_service.translate_en_to_ja(
                 response_text_en,
-                context_messages_ja if context_messages_ja else None
+                context_messages_en if context_messages_en else None
             )
 
             status.status = "completed"

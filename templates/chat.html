@@ -83,24 +83,18 @@ function appendMessage(role, content) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// ステータスを表示
-function showStatus(statuses) {
+// ステータスを表示（最新のprocessingステータスのみ）
+function showStatus(status) {
+    if (!status || status.status !== 'processing') {
+        statusArea.innerHTML = '';
+        return;
+    }
+
     statusArea.innerHTML = '';
-
-    if (!statuses || statuses.length === 0) return;
-
-    const statusList = document.createElement('div');
-    statusList.className = 'status-list';
-
-    // 処理中のステータスのみを表示（completedは非表示）
-    statuses.filter(s => s.status === 'processing').forEach(status => {
-        const statusItem = document.createElement('div');
-        statusItem.className = `status-item status-${status.status}`;
-        statusItem.textContent = status.display_text;
-        statusList.appendChild(statusItem);
-    });
-
-    statusArea.appendChild(statusList);
+    const statusItem = document.createElement('div');
+    statusItem.className = `status-item status-${status.status}`;
+    statusItem.textContent = status.display_text;
+    statusArea.appendChild(statusItem);
 }
 
 // ステータスをクリア
@@ -153,7 +147,6 @@ chatForm.addEventListener('submit', async (e) => {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
-        const currentStatuses = [];
 
         while (true) {
             const {value, done} = await reader.read();
@@ -169,9 +162,8 @@ chatForm.addEventListener('submit', async (e) => {
                 const data = JSON.parse(line.substring(6));
 
                 if (data.type === 'status') {
-                    // ステータスを追加して表示
-                    currentStatuses.push(data.data);
-                    showStatus(currentStatuses);
+                    // 最新のステータスを表示
+                    showStatus(data.data);
                 } else if (data.type === 'response') {
                     // 応答を即座に表示
                     clearStatus();
