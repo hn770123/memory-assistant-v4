@@ -365,15 +365,15 @@ class TestDefaultAttributeMasters(unittest.TestCase):
         """デフォルト属性マスタの作成テスト"""
         count = create_default_attribute_masters(self.db)
 
-        # 6つの属性が作成されることを確認
-        self.assertEqual(count, 6)
+        # 4つの属性が作成されることを確認
+        self.assertEqual(count, 4)
 
         masters = self.db.get_all_attribute_masters()
-        self.assertEqual(len(masters), 6)
+        self.assertEqual(len(masters), 4)
 
         # 期待される属性名を確認
         attribute_names = [m.attribute_name for m in masters]
-        expected_names = ["プロフィール", "趣味・興味", "スケジュール", "連絡先", "好み・嗜好", "目標・課題"]
+        expected_names = ["User Profile", "Current Tasks & Projects", "Expertise & Skills", "Past Decisions & Policies"]
         for name in expected_names:
             self.assertIn(name, attribute_names)
 
