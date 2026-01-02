@@ -6,6 +6,7 @@ import json
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional, Callable
 import urllib.request
 import urllib.error
@@ -22,22 +23,22 @@ class LLMClient(ABC):
     """LLMクライアントの抽象基底クラス"""
 
     def __init__(self):
-        # ログ記録用コールバック関数 (prompt, response, task_type, attribute_name) -> None
-        self.log_callback: Optional[Callable[[str, LLMResponse, str, Optional[str]], None]] = None
+        # ログ記録用コールバック関数 (prompt, response, task_type, attribute_name, sent_at, received_at) -> None
+        self.log_callback: Optional[Callable[[str, LLMResponse, str, Optional[str], Optional[datetime], Optional[datetime]], None]] = None
 
     @abstractmethod
     def generate(self, prompt: str, task_type: str = "general", attribute_name: Optional[str] = None) -> LLMResponse:
         """プロンプトからテキストを生成"""
         pass
 
-    def set_log_callback(self, callback: Callable[[str, LLMResponse, str, Optional[str]], None]):
+    def set_log_callback(self, callback: Callable[[str, LLMResponse, str, Optional[str], Optional[datetime], Optional[datetime]], None]):
         """ログ記録用コールバック関数を設定"""
         self.log_callback = callback
 
-    def _log_interaction(self, prompt: str, response: LLMResponse, task_type: str, attribute_name: Optional[str] = None):
+    def _log_interaction(self, prompt: str, response: LLMResponse, task_type: str, attribute_name: Optional[str] = None, sent_at: Optional[datetime] = None, received_at: Optional[datetime] = None):
         """ログを記録（コールバックが設定されている場合）"""
         if self.log_callback:
-            self.log_callback(prompt, response, task_type, attribute_name)
+            self.log_callback(prompt, response, task_type, attribute_name, sent_at, received_at)
 
     def judge(self, judgment_prompt: str, user_input: str, attribute_name: Optional[str] = None) -> bool:
         """
@@ -279,14 +280,21 @@ class OllamaClient(LLMClient):
         )
 
         try:
+            # 送信時刻を記録（ミリ秒精度）
+            sent_at = datetime.now()
+
             with urllib.request.urlopen(request, timeout=60) as response:
                 result = json.loads(response.read().decode("utf-8"))
+
+                # 受信時刻を記録（ミリ秒精度）
+                received_at = datetime.now()
+
                 llm_response = LLMResponse(
                     content=result.get("response", ""),
                     raw_response=result
                 )
                 # ログを記録
-                self._log_interaction(prompt, llm_response, task_type, attribute_name)
+                self._log_interaction(prompt, llm_response, task_type, attribute_name, sent_at, received_at)
                 return llm_response
         except urllib.error.URLError as e:
             raise ConnectionError(f"Ollama API接続エラー: {e}")

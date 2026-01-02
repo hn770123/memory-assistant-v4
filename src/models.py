@@ -84,10 +84,12 @@ class LLMLog:
     """LLMリクエスト/レスポンスログ"""
     log_id: Optional[int]
     timestamp: datetime
-    model: str
-    task_type: str  # "judgment", "response", "attribute_extraction", "translation_ja_to_en", "translation_en_to_ja"
-    prompt: str  # LLMに送信した完全なプロンプト
-    response: str  # LLMからの応答テキスト
+    sent_at: Optional[datetime] = None  # LLMへの送信時刻（ミリ秒精度）
+    received_at: Optional[datetime] = None  # LLMからの受信時刻（ミリ秒精度）
+    model: str = ""
+    task_type: str = ""  # "judgment", "response", "attribute_extraction", "translation_ja_to_en", "translation_en_to_ja"
+    prompt: str = ""  # LLMに送信した完全なプロンプト
+    response: str = ""  # LLMからの応答テキスト
     raw_response: Optional[str] = None  # JSON形式のraw response
     attribute_name: Optional[str] = None  # タスクに関連する属性名
     metadata: Optional[str] = None  # 追加のメタデータ（JSON形式）

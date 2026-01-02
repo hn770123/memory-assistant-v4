@@ -48,7 +48,7 @@ else:
     llm_client.add_generate_response("こんにちは！どのようにお手伝いできますか？")
 
 # LLMログコールバック関数
-def llm_log_callback(prompt: str, response: LLMResponse, task_type: str, attribute_name: str = None):
+def llm_log_callback(prompt: str, response: LLMResponse, task_type: str, attribute_name: str = None, sent_at: datetime = None, received_at: datetime = None):
     """LLMとのやり取りをデータベースに記録"""
     # モデル名を取得
     model = getattr(llm_client, 'model', 'mock')
@@ -61,6 +61,8 @@ def llm_log_callback(prompt: str, response: LLMResponse, task_type: str, attribu
     log = LLMLog(
         log_id=None,
         timestamp=datetime.now(),
+        sent_at=sent_at,
+        received_at=received_at,
         model=model,
         task_type=task_type,
         prompt=prompt,
@@ -276,6 +278,8 @@ def api_logs():
             {
                 "log_id": log.log_id,
                 "timestamp": log.timestamp.isoformat(),
+                "sent_at": log.sent_at.isoformat() if log.sent_at else None,
+                "received_at": log.received_at.isoformat() if log.received_at else None,
                 "model": log.model,
                 "task_type": log.task_type,
                 "prompt": log.prompt,

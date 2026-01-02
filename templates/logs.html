@@ -49,9 +49,24 @@ async function loadLogs() {
             const logItem = document.createElement('div');
             logItem.className = 'log-item';
 
-            const timestamp = new Date(log.timestamp).toLocaleString('ja-JP');
+            const timestamp = formatTimestampWithMs(log.timestamp);
             const taskTypeLabel = getTaskTypeLabel(log.task_type);
             const attributeInfo = log.attribute_name ? ` - ${escapeHtml(log.attribute_name)}` : '';
+
+            // 送信時刻と受信時刻の表示
+            let timingInfo = '';
+            if (log.sent_at && log.received_at) {
+                const sentAt = formatTimestampWithMs(log.sent_at);
+                const receivedAt = formatTimestampWithMs(log.received_at);
+                const duration = calculateDuration(log.sent_at, log.received_at);
+                timingInfo = `
+                    <div class="log-timing">
+                        <span>送信時刻: ${sentAt}</span>
+                        <span>受信時刻: ${receivedAt}</span>
+                        <span>処理時間: ${duration}</span>
+                    </div>
+                `;
+            }
 
             let rawResponseHtml = '';
             if (log.raw_response) {
@@ -89,6 +104,7 @@ async function loadLogs() {
                     <span class="log-model">${escapeHtml(log.model)}</span>
                     <span class="log-timestamp">${timestamp}</span>
                 </div>
+                ${timingInfo}
                 <div class="log-content">
                     <div class="log-section">
                         <h4>送信 (プロンプト全体)</h4>
@@ -117,9 +133,40 @@ function getTaskTypeLabel(taskType) {
         'extraction': '抽出',
         'response': '応答生成',
         'attribute_extraction': '属性抽出',
-        'general': '一般'
+        'general': '一般',
+        'translation_ja_to_en': '翻訳(日→英)',
+        'translation_en_to_ja': '翻訳(英→日)'
     };
     return labels[taskType] || taskType;
+}
+
+// ミリ秒まで含めたタイムスタンプをフォーマット
+function formatTimestampWithMs(timestamp) {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const milliseconds = String(date.getMilliseconds()).padStart(3, '0');
+    return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
+}
+
+// 処理時間を計算
+function calculateDuration(sentAt, receivedAt) {
+    if (!sentAt || !receivedAt) return '';
+    const sent = new Date(sentAt);
+    const received = new Date(receivedAt);
+    const durationMs = received - sent;
+
+    if (durationMs < 1000) {
+        return `${durationMs}ms`;
+    } else {
+        const seconds = (durationMs / 1000).toFixed(3);
+        return `${seconds}秒`;
+    }
 }
 
 // HTMLエスケープ

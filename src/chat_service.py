@@ -253,6 +253,9 @@ class ChatService:
         self.chat_history.append(ChatMessage(role="user", content=user_input, content_en=user_input_en))
 
         # === Step 1 & 2: 属性の判定と抽出 ===
+        start_time = datetime.now()
+        print(f"[属性判定] 開始: {start_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
+
         masters = self.db.get_all_attribute_masters()
         required_attributes: dict[str, str] = {}
 
@@ -266,16 +269,31 @@ class ChatService:
             task_statuses.append(status)
             yield status
 
+            judge_start = datetime.now()
+            print(f"[属性判定] 「{master.attribute_name}」判定開始: {judge_start.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
+
             is_required = self.llm.judge(master.judgment_prompt, user_input_en, master.attribute_name)
+
+            judge_end = datetime.now()
+            judge_duration_ms = (judge_end - judge_start).total_seconds() * 1000
+            print(f"[属性判定] 「{master.attribute_name}」判定完了: {judge_end.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} (処理時間: {judge_duration_ms:.0f}ms, 結果: {'必要' if is_required else '不要'})")
 
             status.status = "completed"
             yield status
 
             if is_required:
                 # Step 2: 属性データの取得（瞬時に完了するのでステータス表示なし）
+                db_start = datetime.now()
                 content = self.db.get_latest_attribute_content(master.attribute_id)
+                db_end = datetime.now()
+                db_duration_ms = (db_end - db_start).total_seconds() * 1000
+                print(f"[DB取得] 「{master.attribute_name}」取得完了: {db_end.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} (処理時間: {db_duration_ms:.0f}ms)")
                 if content:
                     required_attributes[master.attribute_name] = content
+
+        end_time = datetime.now()
+        total_duration_ms = (end_time - start_time).total_seconds() * 1000
+        print(f"[属性判定] 完了: {end_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} (総処理時間: {total_duration_ms:.0f}ms)")
 
         # === Step 3: 応答文の生成 ===
         status = LLMTaskStatus(
@@ -284,6 +302,9 @@ class ChatService:
         )
         task_statuses.append(status)
         yield status
+
+        response_start = datetime.now()
+        print(f"[応答生成] 開始: {response_start.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
 
         # チャット履歴を構築（現在のユーザー入力は除外し、それ以前の直近5件を使用）
         if self.translation_service:
@@ -302,6 +323,10 @@ class ChatService:
             user_input=user_input_en,
             attributes=required_attributes
         )
+
+        response_end = datetime.now()
+        response_duration_ms = (response_end - response_start).total_seconds() * 1000
+        print(f"[応答生成] 完了: {response_end.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} (処理時間: {response_duration_ms:.0f}ms)")
 
         status.status = "completed"
         yield status
@@ -345,6 +370,9 @@ class ChatService:
         yield response_ready_status
 
         # === Step 5: 属性抽出・登録 ===
+        extraction_start = datetime.now()
+        print(f"[属性抽出] 開始: {extraction_start.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
+
         extracted_attributes: list[tuple[str, str]] = []
 
         for master in masters:
@@ -356,8 +384,15 @@ class ChatService:
             task_statuses.append(status)
             yield status
 
+            extract_start = datetime.now()
+            print(f"[属性抽出] 「{master.attribute_name}」抽出開始: {extract_start.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
+
             # 英語の入力を使用して属性を抽出
             extracted = self.llm.extract(master.extraction_prompt, user_input_en, master.attribute_name)
+
+            extract_end = datetime.now()
+            extract_duration_ms = (extract_end - extract_start).total_seconds() * 1000
+            print(f"[属性抽出] 「{master.attribute_name}」抽出完了: {extract_end.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} (処理時間: {extract_duration_ms:.0f}ms, 結果: {extracted if extracted else 'なし'})")
 
             if extracted:
                 record = AttributeRecord(
@@ -365,11 +400,19 @@ class ChatService:
                     attribute_id=master.attribute_id,
                     content=extracted
                 )
+                db_insert_start = datetime.now()
                 self.db.insert_attribute_record(record)
+                db_insert_end = datetime.now()
+                db_insert_duration_ms = (db_insert_end - db_insert_start).total_seconds() * 1000
+                print(f"[DB保存] 「{master.attribute_name}」保存完了: {db_insert_end.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} (処理時間: {db_insert_duration_ms:.0f}ms)")
                 extracted_attributes.append((master.attribute_name, extracted))
 
             status.status = "completed"
             yield status
+
+        extraction_end = datetime.now()
+        extraction_total_duration_ms = (extraction_end - extraction_start).total_seconds() * 1000
+        print(f"[属性抽出] 完了: {extraction_end.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} (総処理時間: {extraction_total_duration_ms:.0f}ms)")
 
         return ChatResponse(
             response_text=response_text,
