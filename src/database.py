@@ -66,6 +66,8 @@ class Database:
             CREATE TABLE IF NOT EXISTS llm_logs (
                 log_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT NOT NULL,
+                sent_at TEXT,
+                received_at TEXT,
                 model TEXT NOT NULL,
                 task_type TEXT NOT NULL,
                 prompt TEXT NOT NULL,
@@ -75,6 +77,17 @@ class Database:
                 metadata TEXT
             )
         """)
+
+        # 既存のテーブルにカラムを追加（マイグレーション）
+        try:
+            cursor.execute("ALTER TABLE llm_logs ADD COLUMN sent_at TEXT")
+        except sqlite3.OperationalError:
+            pass  # カラムが既に存在する場合
+
+        try:
+            cursor.execute("ALTER TABLE llm_logs ADD COLUMN received_at TEXT")
+        except sqlite3.OperationalError:
+            pass  # カラムが既に存在する場合
 
         conn.commit()
 
@@ -264,13 +277,15 @@ class Database:
         cursor.execute(
             """
             INSERT INTO llm_logs (
-                timestamp, model, task_type, prompt, response,
+                timestamp, sent_at, received_at, model, task_type, prompt, response,
                 raw_response, attribute_name, metadata
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 log.timestamp.isoformat(),
+                log.sent_at.isoformat() if log.sent_at else None,
+                log.received_at.isoformat() if log.received_at else None,
                 log.model,
                 log.task_type,
                 log.prompt,
@@ -298,6 +313,8 @@ class Database:
             LLMLog(
                 log_id=row["log_id"],
                 timestamp=datetime.fromisoformat(row["timestamp"]),
+                sent_at=datetime.fromisoformat(row["sent_at"]) if row["sent_at"] else None,
+                received_at=datetime.fromisoformat(row["received_at"]) if row["received_at"] else None,
                 model=row["model"],
                 task_type=row["task_type"],
                 prompt=row["prompt"],

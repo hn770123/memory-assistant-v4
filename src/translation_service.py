@@ -3,6 +3,7 @@
 LLMを使用して日本語と英語の翻訳を行う
 """
 from typing import Optional
+from datetime import datetime
 from .llm_client import LLMClient
 
 
@@ -32,6 +33,9 @@ class TranslationService:
         Returns:
             翻訳された英語テキスト
         """
+        start_time = datetime.now()
+        print(f"[翻訳] 日本語→英語 開始: {start_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
+
         context_text = ""
         if context_messages:
             context_text = "\n<Recent Conversation Context>\n"
@@ -47,6 +51,11 @@ class TranslationService:
 </Japanese Text>"""
 
         response = self.llm_client.generate(prompt, task_type="translation_ja_to_en")
+
+        end_time = datetime.now()
+        duration_ms = (end_time - start_time).total_seconds() * 1000
+        print(f"[翻訳] 日本語→英語 完了: {end_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} (処理時間: {duration_ms:.0f}ms)")
+
         return response.content.strip()
 
     def translate_en_to_ja(
@@ -65,6 +74,9 @@ class TranslationService:
         Returns:
             翻訳された日本語テキスト
         """
+        start_time = datetime.now()
+        print(f"[翻訳] 英語→日本語 開始: {start_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
+
         context_text = ""
         if context_messages:
             context_text = "\n<Recent Conversation Context>\n"
@@ -80,4 +92,9 @@ class TranslationService:
 </English Text>"""
 
         response = self.llm_client.generate(prompt, task_type="translation_en_to_ja")
+
+        end_time = datetime.now()
+        duration_ms = (end_time - start_time).total_seconds() * 1000
+        print(f"[翻訳] 英語→日本語 完了: {end_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} (処理時間: {duration_ms:.0f}ms)")
+
         return response.content.strip()
